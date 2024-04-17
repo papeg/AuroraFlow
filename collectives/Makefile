@@ -22,7 +22,9 @@ PLATFORM ?= xilinx_u280_gen3x16_xdma_1_202211_1
 
 TARGET := hw
 
+.PHONY: all host clean
 
+all: offload_$(TARGET).xo test_$(TARGET).xo 
 
 # synth flags
 COMMFLAGS := --platform $(PLATFORM) --target $(TARGET) --save-temps --debug
@@ -34,6 +36,9 @@ LINKFLAGS := --link --optimize 3 $(COMMFLAGS)
 
 offload_$(TARGET).xo: ./offload.cpp ./collectives.hpp
 	v++ $(HLSCFLAGS) --temp_dir _x_offload --kernel offload --output $@ $^
+
+test_$(TARGET).xo: ./test.cpp ./collectives.hpp
+	v++ $(HLSCFLAGS) --temp_dir _x_test --kernel test --output $@ $^
 
 # host build for example
 CXXFLAGS += -std=c++17 -Wall -g
