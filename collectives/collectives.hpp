@@ -185,13 +185,22 @@ inline void unpack_word(stream_word_union_t &word, T *values)
 template <typename T>
 inline void write_array(STREAM<stream_word> &out, T *values, uint32_t count)
 {
-    stream_word_union_t data;
     uint32_t width = get_width<T>();
-    for (uint32_t i = 0; i < count; i += width)
+write_array_loop:
+    for (uint32_t i = 0; i < count; i += (2 * width))
     {
-#pragma HLS pipeline II=1
-        pack_word(data, values + i);
-        out.write(data.word_data);
+#pragma HLS pipeline II=2
+// not enough memory ports for II=1
+        stream_word_union_t data_0;
+        pack_word(data_0, values + i);
+        out.write(data_0.word_data);
+// handle case when (count % (2 * width) == width)
+        if ((i + width) < count)
+        {
+            stream_word_union_t data_1;
+            pack_word(data_1, values + i + width);
+            out.write(data_1.word_data);
+        }
     }
 }
 
@@ -200,6 +209,7 @@ inline void read_array(STREAM<stream_word> &in, T *values, uint32_t count)
 {
     stream_word_union_t data;
     uint32_t width = get_width<T>();
+read_array_loop:
     for (uint32_t i = 0; i < count; i += width)
     {
 #pragma HLS pipeline II=1
