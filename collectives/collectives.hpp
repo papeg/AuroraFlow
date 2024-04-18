@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#pragma once
 
 #include <ap_int.h>
 #include <ap_axi_sdata.h>
@@ -28,6 +29,7 @@
 #include "hls_stream.h"
 #include "etc/autopilot_ssdm_op.h"
 #define STREAM hls::stream
+#define read_nb ReadNonBlocking
 #endif
 
 #define DATA_WIDTH 512
@@ -217,6 +219,7 @@ read_array_loop:
         unpack_word(data, values + i);
     }
 }
+
 class ARC
 {
 public:

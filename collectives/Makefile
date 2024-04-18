@@ -14,23 +14,18 @@
 # limitations under the License.
 #
 
-CXX=mpicxx
-
 # change here to test different boards
 PART := xcu280-fsvh2892-2L-e
 PLATFORM ?= xilinx_u280_gen3x16_xdma_1_202211_1
 
 TARGET := hw
 
-.PHONY: all host clean
+.PHONY: all clean
 
 all: offload_$(TARGET).xo test_$(TARGET).xo 
 
 # synth flags
-COMMFLAGS := --platform $(PLATFORM) --target $(TARGET) --save-temps --debug
-ifeq ($(TARGET), hw)
-	COMMFLAGS += -DSYNTHESIS
-endif
+COMMFLAGS := --platform $(PLATFORM) --target $(TARGET) --save-temps --debug -DSYNTHESIS
 HLSCFLAGS := --compile $(COMMFLAGS)
 LINKFLAGS := --link --optimize 3 $(COMMFLAGS)
 
@@ -39,18 +34,6 @@ offload_$(TARGET).xo: ./offload.cpp ./collectives.hpp
 
 test_$(TARGET).xo: ./test.cpp ./collectives.hpp
 	v++ $(HLSCFLAGS) --temp_dir _x_test --kernel test --output $@ $^
-
-# host build for example
-CXXFLAGS += -std=c++17 -Wall -g
-CXXFLAGS += -I$(XILINX_XRT)/include
-CXXFLAGS += -fopenmp
-LDFLAGS := -L$(XILINX_XRT)/lib
-LDFLAGS += $(LDFLAGS) -lxrt_coreutil
-
-host_aurora_hls_test: ./host/host_aurora_hls_test.cpp ./host/Aurora.hpp
-	$(CXX) -o host_aurora_hls_test $< $(CXXFLAGS) $(LDFLAGS)
-
-host: host_aurora_hls_test
 
 clean:
 	git clean -Xdf

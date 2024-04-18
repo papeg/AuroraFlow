@@ -16,6 +16,11 @@
 
 #include "collectives.hpp"
 
+#ifndef SYNTHESIS
+#include "offload.hpp"
+#include <cstdio>
+#endif
+
 inline void stream_array(stream_word_union_t &header, STREAM<stream_word> &in, STREAM<stream_word> &out)
 {
     out.write(header.word_data);
