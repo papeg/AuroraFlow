@@ -20,9 +20,12 @@ PLATFORM ?= xilinx_u280_gen3x16_xdma_1_202211_1
 
 TARGET := hw
 
-.PHONY: all clean
+.PHONY: all aurora xclbin clean
 
 all: offload_$(TARGET).xo test_$(TARGET).xo 
+
+aurora:
+	$(MAKE) -C ..
 
 # synth flags
 COMMFLAGS := --platform $(PLATFORM) --target $(TARGET) --save-temps --debug -DSYNTHESIS
@@ -34,6 +37,11 @@ offload_$(TARGET).xo: ./offload.cpp ./collectives.hpp
 
 test_$(TARGET).xo: ./test.cpp ./collectives.hpp
 	v++ $(HLSCFLAGS) --temp_dir _x_test --kernel test --output $@ $^
+
+collectives_test_hw.xclbin: aurora offload_hw.xo test_hw.xo link.cfg
+	v++ $(LINKFLAGS) --temp_dir _x_collectives_test --config link.cfg --output $@ ../aurora_hls_0.xo ../aurora_hls_1.xo offload_hw.xo test_hw.xo
+
+xclbin: collectives_test_hw.xclbin
 
 clean:
 	git clean -Xdf
