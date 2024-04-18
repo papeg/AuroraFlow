@@ -17,5 +17,5 @@
 
 extern "C"
 {
-    void test(uint32_t collective, uint32_t datatype, uint32_t count, uint32_t iterations, uint32_t rank, uint32_t size, STREAM<stream_word> &offload_in, STREAM<stream_word> &offload_out);
+    void test(uint32_t collective, uint32_t datatype, uint32_t count, uint32_t iterations, int rank, int size, STREAM<stream_word> &offload_in, STREAM<stream_word> &offload_out);
 }
