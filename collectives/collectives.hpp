@@ -29,7 +29,6 @@
 #include "hls_stream.h"
 #include "etc/autopilot_ssdm_op.h"
 #define STREAM hls::stream
-#define read_nb ReadNonBlocking
 #endif
 
 #define DATA_WIDTH 512
@@ -236,13 +235,13 @@ public:
         if (rank == root)
         {
             header.header = create_header<T>(Collective::Bcast, count, root);
-            offload_out.write(header.word_data); 
-            write_array<T>(offload_out, values, count);
+            offload_in.write(header.word_data); 
+            write_array<T>(offload_in, values, count);
         }
         else
         {
-            header.word_data = offload_in.read();    
-            read_array<T>(offload_in, values, count);
+            header.word_data = offload_out.read();    
+            read_array<T>(offload_out, values, count);
         }
     }
 
