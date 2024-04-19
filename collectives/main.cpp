@@ -46,7 +46,11 @@ int main(int argc, char **argv)
 
     std::thread offload_kernel(offload, rank, size, std::ref(ring_0_in), std::ref(ring_0_out), std::ref(ring_1_in), std::ref(ring_1_out), std::ref(offload_in), std::ref(offload_out));
 
-    test(Collective::Bcast, Datatype::Double, 1024, 10, rank, size, offload_in, offload_out);
+    // count is number of channel widths (512bits/64bytes)
+    test(Collective::Bcast, Datatype::Double, 64, 2, rank, size, offload_in, offload_out);
+
+    // no way to terminate thread right now, exit by hand here
+    offload_kernel.join();
 
     MPI_Finalize();
 }
