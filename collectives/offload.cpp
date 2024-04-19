@@ -77,7 +77,11 @@ extern "C"
                         }
                         break;
                     case Collective::Bcast:
-                        if (header.header.root != rank)
+                        if ((header.header.root + size - 1) == rank)
+                        {
+                            stream_array(header, ring_0_in, offload_out);
+                        }
+                        else if (header.header.root != rank)
                         {
                             fork_array(header, ring_0_in, ring_0_out, offload_out);
                         }
