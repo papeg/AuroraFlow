@@ -93,6 +93,16 @@ public:
         test_run.set_arg(6, errors_bo);
     }
 
+    void write_metrics(Collective collective, Datatype datatype, uint32_t errors, uint32_t count, uint32_t iterations, double run_time)
+    {
+        while (rename("./build/results.csv", "./build/results.csv.lock") != 0) {}
+        std::ofstream of;
+        of.open("./build/results.csv.lock", std::ios_base::app);
+        of << rank << "," << size << "," << collective << "," << datatype << "," << errors << "," << count << "," << iterations << "," << run_time << std::endl;
+        of.close();
+        rename("./build/result.csv.lock", "./build/results.csv");
+    }
+
     uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations)
     {
         test_run.set_arg(0, collective);
@@ -100,19 +110,32 @@ public:
         test_run.set_arg(2, count);
         test_run.set_arg(3, iterations);
 
+        double start_time = get_wtime();
         test_run.start();
 
         test_run.wait();
+        double run_time = get_wtime() - start_time;
 
         uint32_t errors;
         errors_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
         errors_bo.read(&errors);
+
+        double run_time_max;
+        uint32_t errors_sum;
+        MPI_Reduce(&run_time, &run_time_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&errors, &errors_sum, 1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
+        if (rank == 0)
+        {
+            write_metrics(collective, datatype, errors_sum, count, iterations, run_time_max);
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
         return errors;
     }
 
     xrt::kernel test_kernel, offload_kernel;
     xrt::run test_run, offload_run;
     xrt::bo errors_bo;
+    std::string metrics;
 };
 
 class SoftwareTestKernel: public TestKernel
@@ -140,7 +163,9 @@ public:
         // count is number of channel widths (512bits/64bytes)
         uint32_t errors = 0;
         test(collective, datatype, count, iterations, rank, size, &errors, offload_in, offload_out);
-        return errors;
+        uint32_t errors_sum;
+        MPI_Reduce(&errors, &errors_sum, 1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
+        return errors_sum;
     }
 
     std::optional<AuroraEmuSwitch> aurora_switch;
@@ -164,6 +189,7 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD , &size);
 
     bool emulation = (std::getenv("XCL_EMULATION_MODE") != nullptr);
+
 
     if (emulation)
     {
@@ -193,16 +219,27 @@ int main(int argc, char **argv)
         }
         HardwareTestKernel test_kernel(rank, size, device, xclbin_uuid);
 
+        uint32_t iterations = 1;
+        uint32_t count_max = 2048;
         for (Collective collective: {Collective::Bcast})
         {
             for (Datatype datatype: {Datatype::Double})
             {
-                errors += test_kernel.run_test(collective, datatype, 64, 2);
+                for (uint32_t count = 1; count <= count_max; count <<= 1)
+                {
+                    if (rank == 0)
+                    {
+                        std::cout << "testing collective: " << collective << ", datatype: " << datatype << ", count: " << count << std::endl;
+                    }
+                    errors += test_kernel.run_test(collective, datatype, count, iterations);
+                    MPI_Barrier(MPI_COMM_WORLD);
+                }
             }
         }
-        std::cout << "All tests have run, total errors: " << errors << std::endl;
-        test_kernel.offload_run.wait();
-
+        if (rank == 0) {
+            std::cout << "All tests have run, total errors: " << errors << std::endl;
+        }
+        //test_kernel.offload_run.stop();
     }
     MPI_Finalize();
 }

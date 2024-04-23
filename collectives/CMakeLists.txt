@@ -31,5 +31,8 @@ include_directories($ENV{XILINX_XRT})
 link_directories($ENV{XILINX_XRT}/lib)
 link_libraries(xrt_coreutil uuid)
 
+add_custom_command(OUTPUT results.csv COMMAND touch results.csv)
+add_custom_target(results_file ALL DEPENDS results.csv)
+
 add_executable(host_test_collectives ${SOURCE_FILES} ${KERNEL_FILES})
 target_link_libraries(host_test_collectives PUBLIC auroraemu)
