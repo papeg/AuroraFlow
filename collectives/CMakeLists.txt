@@ -27,8 +27,8 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 link_libraries(${MPI_LIBRARIES})
 
 #find_package(XRT REQUIRED)
-include_directories(/opt/software/FPGA/Xilinx/xrt/xrt_2.15)
-link_directories(/opt/software/FPGA/Xilinx/xrt/xrt_2.15/lib)
+include_directories($ENV{XILINX_XRT})
+link_directories($ENV{XILINX_XRT}/lib)
 link_libraries(xrt_coreutil uuid)
 
 add_executable(host_test_collectives ${SOURCE_FILES} ${KERNEL_FILES})
