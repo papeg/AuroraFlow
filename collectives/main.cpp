@@ -172,9 +172,9 @@ int main(int argc, char **argv)
     else
     {
         xrt::device device(rank % 3);
-        xrt::uuid xclbin_uuid("collectives_test_hw.xclbin");
+        xrt::uuid xclbin_uuid = device.load_xclbin("collectives_test_hw.xclbin");
         AuroraRing aurora_ring(device, xclbin_uuid);
-        if (!aurora_ring.check_core_status_global(3000, rank, size))
+        if (aurora_ring.check_core_status_global(3000, rank, size))
         {
             MPI_Abort(MPI_COMM_WORLD, rank);
         }
@@ -187,6 +187,7 @@ int main(int argc, char **argv)
                 test_kernel.run_test(collective, datatype, 64, 2);
             }
         }
+        std::cout << "All tests have run" << std::endl;
         test_kernel.offload_run.wait();
 
     }
