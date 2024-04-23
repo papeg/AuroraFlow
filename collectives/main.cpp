@@ -63,7 +63,7 @@ class TestKernel
 public:
     TestKernel(int rank, int size) : rank(rank), size(size) {}
 
-    virtual void run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations) = 0;
+    virtual uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations) = 0;
 
     int rank, size;
 };
@@ -87,9 +87,13 @@ public:
 
         test_run.set_arg(4, rank);
         test_run.set_arg(5, size);
+
+        errors_bo = xrt::bo(device, 1, xrt::bo::flags::normal, test_kernel.group_id(6));
+
+        test_run.set_arg(6, errors_bo);
     }
 
-    void run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations)
+    uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations)
     {
         test_run.set_arg(0, collective);
         test_run.set_arg(1, datatype);
@@ -99,10 +103,16 @@ public:
         test_run.start();
 
         test_run.wait();
+
+        uint32_t errors;
+        errors_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+        errors_bo.read(&errors);
+        return errors;
     }
 
     xrt::kernel test_kernel, offload_kernel;
     xrt::run test_run, offload_run;
+    xrt::bo errors_bo;
 };
 
 class SoftwareTestKernel: public TestKernel
@@ -125,10 +135,12 @@ public:
         }
     }
 
-    void run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations)
+    uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations)
     {
         // count is number of channel widths (512bits/64bytes)
-        test(collective, datatype, count, iterations, rank, size, offload_in, offload_out);
+        uint32_t errors = 0;
+        test(collective, datatype, count, iterations, rank, size, &errors, offload_in, offload_out);
+        return errors;
     }
 
     std::optional<AuroraEmuSwitch> aurora_switch;
@@ -171,6 +183,7 @@ int main(int argc, char **argv)
     }
     else
     {
+        uint32_t errors = 0;
         xrt::device device(rank % 3);
         xrt::uuid xclbin_uuid = device.load_xclbin("collectives_test_hw.xclbin");
         AuroraRing aurora_ring(device, xclbin_uuid);
@@ -184,10 +197,10 @@ int main(int argc, char **argv)
         {
             for (Datatype datatype: {Datatype::Double})
             {
-                test_kernel.run_test(collective, datatype, 64, 2);
+                errors += test_kernel.run_test(collective, datatype, 64, 2);
             }
         }
-        std::cout << "All tests have run" << std::endl;
+        std::cout << "All tests have run, total errors: " << errors << std::endl;
         test_kernel.offload_run.wait();
 
     }
