@@ -63,7 +63,7 @@ compare_data_loop:
 
 extern "C"
 {
-    void test(uint32_t collective, uint32_t datatype, uint32_t count, uint32_t iterations, int rank, int size, STREAM<stream_word> &offload_in, STREAM<stream_word> &offload_out)
+    void test(uint32_t collective, uint32_t datatype, uint32_t count, uint32_t iterations, int rank, int size, uint32_t *errors, STREAM<stream_word> &offload_in, STREAM<stream_word> &offload_out)
     {
         // test data
         double double_data[count_max * 8];
@@ -78,6 +78,7 @@ extern "C"
             zero_data(double_data);
         }
 
+        *errors = 0;
         ARC arc(rank, size, offload_in, offload_out);
         if (collective == Collective::Bcast)
         {
@@ -88,7 +89,7 @@ extern "C"
                 {
                     arc.bcast(double_data, count, 0);
                 }
-                compare_data(double_data, ref_data, count);
+                *errors += compare_data(double_data, ref_data, count);
             }
         }
     }
