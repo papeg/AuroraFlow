@@ -1,0 +1,18 @@
+#!/bin/bash
+
+#SBATCH -t 02:00:00
+#SBATCH -n 6
+#SBATCH --ntasks-per-node 3
+#SBATCH -J "metalwalls_aurora"
+#SBATCH -p fpga
+#SBATCH -A hpc-lco-kenter
+#SBATCH --constraint xilinx_u280_xrt2.15
+
+## Load environment modules
+source env.sh
+
+#https://pc2.github.io/fpgalink-gui/index.html?import=%20--fpgalink%3Dn01%3Aacl1%3Ach1-n01%3Aacl0%3Ach0%20--fpgalink%3Dn00%3Aacl0%3Ach1-n01%3Aacl2%3Ach0%20--fpgalink%3Dn00%3Aacl2%3Ach1-n00%3Aacl1%3Ach0%20--fpgalink%3Dn00%3Aacl1%3Ach1-n00%3Aacl0%3Ach0%20--fpgalink%3Dn01%3Aacl2%3Ach1-n01%3Aacl1%3Ach0%20--fpgalink%3Dn01%3Aacl0%3Ach1-n00%3Aacl2%3Ach0
+changeFPGAlinksXilinx --fpgalink=n01:acl1:ch1-n01:acl0:ch0 --fpgalink=n00:acl0:ch1-n01:acl2:ch0 --fpgalink=n00:acl2:ch1-n00:acl1:ch0 --fpgalink=n00:acl1:ch1-n00:acl0:ch0 --fpgalink=n01:acl2:ch1-n01:acl1:ch0 --fpgalink=n01:acl0:ch1-n00:acl2:ch0
+srun -l -n 2 --spread-job ../scripts/reset.sh
+
+srun -l -n 6 ./build/host_test_collectives
