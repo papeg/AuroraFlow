@@ -55,7 +55,7 @@ typedef struct collectives_header {
 } collectives_header_t;
 
 template <typename T>
-collectives_header_t create_header(Collective collective, uint32_t count, uint32_t root, uint32_t op = 0, uint32_t dest = 0, uint32_t tag = 0)
+collectives_header_t create_header(Collective collective, uint32_t count, uint32_t root, uint32_t dest = 0, uint32_t op = 0, uint32_t tag = 0)
 {
     collectives_header_t header;
     header.collective = collective;
@@ -227,6 +227,53 @@ public:
     
     uint32_t rank, size;
     STREAM<stream_word> &offload_in, &offload_out;
+
+    template<typename T>
+    void p2p(T *values, uint32_t count, uint32_t root, uint32_t dest)
+    {
+        stream_word_union_t header;
+        if (rank == root)
+        {
+            header.header = create_header<T>(Collective::P2P, count, root, dest);
+            offload_in.write(header.word_data);
+            write_array<T>(offload_in, values, count);
+        }
+        else if (rank == dest)
+        {
+            header.word_data = offload_out.read();    
+            read_array<T>(offload_out, values, count);
+        }
+    }
+
+    void p2p(double *values, uint32_t count, uint32_t root, uint32_t dest)
+    {
+        p2p<double>(values, count, root, dest);
+    }
+
+    void p2p(float *values, uint32_t count, uint32_t root, uint32_t dest)
+    {
+        p2p<float>(values, count, root, dest);
+    }
+
+    void p2p(int64_t *values, uint32_t count, uint32_t root, uint32_t dest)
+    {
+        p2p<int64_t>(values, count, root, dest);
+    }
+
+    void p2p(uint64_t *values, uint32_t count, uint32_t root, uint32_t dest)
+    {
+        p2p<uint64_t>(values, count, root, dest);
+    }
+
+    void p2p(int32_t *values, uint32_t count, uint32_t root, uint32_t dest)
+    {
+        p2p<int32_t>(values, count, root, dest);
+    }
+
+    void p2p(uint32_t *values, uint32_t count, uint32_t root, uint32_t dest)
+    {
+        p2p<uint32_t>(values, count, root, dest);
+    }
 
     template <typename T>
     void bcast(T *values, uint32_t count, uint32_t root)

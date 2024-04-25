@@ -1,0 +1,62 @@
+/*
+ * Copyright 2024 Gerrit Pape (papeg@mail.upb.de)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "../collectives.hpp"
+#include "common.hpp"
+
+#ifndef SYNTHESIS
+#include "rx.hpp"
+#include <cstdio>
+#endif
+
+extern "C"
+{
+    void rx(int rank, int size,
+        STREAM<stream_word> &ring_in,
+        STREAM<stream_word> &ring_out,
+        STREAM<stream_word> &offload_out)
+    {
+        stream_word_union_t header;
+        while (true)
+        {
+            header.word_data = ring_in.read();    
+            switch (header.header.collective)
+            {
+                case Collective::P2P:
+                    if (header.header.dest == rank)
+                    {
+                        stream_array(header, ring_in, offload_out);
+                    }
+                    else
+                    {
+                        stream_array(header, ring_in, ring_out);
+                    }
+                    break;
+                case Collective::Bcast:
+                    if (header.header.dest == rank)
+                    {
+                        stream_array(header, ring_in, offload_out);
+                    }
+                    else
+                    {
+                        fork_array(header, ring_in, ring_out, offload_out);
+                    }
+                    break;
+            }
+        }
+    }
+}
+ 

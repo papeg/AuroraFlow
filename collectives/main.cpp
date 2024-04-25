@@ -1,5 +1,6 @@
 #include <mpi.h>
 #include <thread>
+#include <chrono>
 #include <memory>
 
 #include "../host/Aurora.hpp"
@@ -7,7 +8,9 @@
 #include "collectives.hpp"
 #include "auroraemu.hpp"
 
-#include "offload.hpp"
+#include "./offload/rx.hpp"
+#include "./offload/tx.hpp"
+#include "./offload/offload.hpp"
 #include "test.hpp"
 
 inline std::string stream_id(std::string prefix, size_t rank)
@@ -143,14 +146,22 @@ class SoftwareTestKernel: public TestKernel
 public:
     SoftwareTestKernel(int rank, int size) :
         TestKernel(rank, size),
-        ring_0_in(stream_id("ring_0_in", rank).c_str()),
-        ring_0_out(stream_id("ring_0_out", rank).c_str()),
-        ring_1_in(stream_id("ring_1_in", rank).c_str()),
-        ring_1_out(stream_id("ring_1_out", rank).c_str()),
+        rx_east_ring_in(stream_id("rx_east_ring_in", rank).c_str()),
+        rx_east_ring_out(stream_id("rx_east_ring_out", rank).c_str()),
+        rx_east_offload_out(stream_id("rx_east_offload_out", rank).c_str()),
+        rx_west_ring_in(stream_id("rx_west_ring_in", rank).c_str()),
+        rx_west_ring_out(stream_id("rx_west_ring_out", rank).c_str()),
+        rx_west_offload_out(stream_id("rx_west_offload_out", rank).c_str()),
+
+        tx_east_ring_out(stream_id("tx_east_ring_out", rank).c_str()),
+        tx_east_offload_in(stream_id("tx_east_offload_out", rank).c_str()),
+        tx_west_ring_out(stream_id("tx_west_ring_out", rank).c_str()),
+        tx_west_offload_in(stream_id("tx_west_offload_out", rank).c_str()),
+
         offload_in(stream_id("offload_in", rank).c_str()),
         offload_out(stream_id("offload_out", rank).c_str()),
-        aurora_core_0("127.0.0.1", 20000, aurora_id(rank, 0), aurora_id((rank + size - 1) % size, 1), ring_1_out, ring_0_in),
-        aurora_core_1("127.0.0.1", 20000, aurora_id(rank, 1), aurora_id((rank + 1) % size, 0), ring_0_out, ring_1_in)
+        aurora_core_0("127.0.0.1", 20000, aurora_id(rank, 0), aurora_id((rank + size - 1) % size, 1), tx_west_ring_out, rx_east_ring_in),
+        aurora_core_1("127.0.0.1", 20000, aurora_id(rank, 1), aurora_id((rank + 1) % size, 0), tx_east_ring_out, rx_west_ring_in)
     {
         if (rank == 0)
         {
@@ -169,10 +180,18 @@ public:
     }
 
     std::optional<AuroraEmuSwitch> aurora_switch;
-    STREAM<stream_word> ring_0_in;
-    STREAM<stream_word> ring_0_out;
-    STREAM<stream_word> ring_1_in;
-    STREAM<stream_word> ring_1_out;
+    STREAM<stream_word> rx_east_ring_in;
+    STREAM<stream_word> rx_east_ring_out;
+    STREAM<stream_word> rx_east_offload_out;
+    STREAM<stream_word> rx_west_ring_in;
+    STREAM<stream_word> rx_west_ring_out;
+    STREAM<stream_word> rx_west_offload_out;
+
+    STREAM<stream_word> tx_east_ring_out;
+    STREAM<stream_word> tx_east_offload_in;
+    STREAM<stream_word> tx_west_ring_out;
+    STREAM<stream_word> tx_west_offload_in;
+
     STREAM<stream_word> offload_in;
     STREAM<stream_word> offload_out;
 
@@ -195,21 +214,37 @@ int main(int argc, char **argv)
     {
         SoftwareTestKernel test_kernel(rank, size);
 
-        std::thread offload_kernel(offload, rank, size, std::ref(test_kernel.ring_0_in), std::ref(test_kernel.ring_0_out), std::ref(test_kernel.ring_1_in), std::ref(test_kernel.ring_1_out), std::ref(test_kernel.offload_in), std::ref(test_kernel.offload_out));
+        std::thread offload_kernel(offload, rank, size, std::ref(test_kernel.rx_east_offload_out), std::ref(test_kernel.tx_east_offload_in), std::ref(test_kernel.rx_west_offload_out), std::ref(test_kernel.tx_west_offload_in), std::ref(test_kernel.offload_in), std::ref(test_kernel.offload_out));
+        std::thread rx_east(rx, rank, size, std::ref(test_kernel.rx_east_ring_in), std::ref(test_kernel.rx_east_ring_out), std::ref(test_kernel.rx_east_offload_out));
+        std::thread rx_west(rx, rank, size, std::ref(test_kernel.rx_west_ring_in), std::ref(test_kernel.rx_west_ring_out), std::ref(test_kernel.rx_west_offload_out));
+        std::thread tx_east(tx, rank, size, std::ref(test_kernel.rx_east_ring_out), std::ref(test_kernel.tx_east_ring_out), std::ref(test_kernel.tx_east_offload_in));
+        std::thread tx_west(tx, rank, size, std::ref(test_kernel.rx_west_ring_out), std::ref(test_kernel.tx_west_ring_out), std::ref(test_kernel.tx_west_offload_in));
+
+        // wait for threads to startup
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(1000ms);
 
         for (Collective collective: {Collective::Bcast})
         {
             for (Datatype datatype: {Datatype::Double})
             {
+                if (rank == 0)
+                {
+                    std::cout << "testing collective: " << collective << ", datatype: " << datatype << std::endl;
+                }
                 test_kernel.run_test(collective, datatype, 64, 2);
             }
+        }
+        if (rank == 0)
+        {
+            std::cout << "all tests have run" << std::endl;
         }
         // no way to terminate thread right now, exit by hand here
         offload_kernel.join();
     }
     else
     {
-        uint32_t errors = 0;
+        uint32_t total_errors = 0;
         xrt::device device(rank % 3);
         xrt::uuid xclbin_uuid = device.load_xclbin("collectives_test_hw.xclbin");
         AuroraRing aurora_ring(device, xclbin_uuid);
@@ -231,15 +266,16 @@ int main(int argc, char **argv)
                     {
                         std::cout << "testing collective: " << collective << ", datatype: " << datatype << ", count: " << count << std::endl;
                     }
-                    errors += test_kernel.run_test(collective, datatype, count, iterations);
+                    uint32_t errors = test_kernel.run_test(collective, datatype, count, iterations);
+                    std::cout << "errors: " << errors << std::endl;
+                    total_errors += errors;
                     MPI_Barrier(MPI_COMM_WORLD);
                 }
             }
         }
         if (rank == 0) {
-            std::cout << "All tests have run, total errors: " << errors << std::endl;
+            std::cout << "All tests have run, total errors: " << total_errors << std::endl;
         }
-        //test_kernel.offload_run.stop();
     }
     MPI_Finalize();
 }
