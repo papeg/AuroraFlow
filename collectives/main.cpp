@@ -66,7 +66,7 @@ class TestKernel
 public:
     TestKernel(int rank, int size) : rank(rank), size(size) {}
 
-    virtual uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations) = 0;
+    virtual uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations, uint32_t dest) = 0;
 
     int rank, size;
 };
@@ -106,7 +106,7 @@ public:
         rename("./build/result.csv.lock", "./build/results.csv");
     }
 
-    uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations)
+    uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations, uint32_t dest = 0)
     {
         test_run.set_arg(0, collective);
         test_run.set_arg(1, datatype);
@@ -169,11 +169,11 @@ public:
         }
     }
 
-    uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations)
+    uint32_t run_test(Collective collective, Datatype datatype, uint32_t count, uint32_t iterations, uint32_t dest = 0)
     {
         // count is number of channel widths (512bits/64bytes)
         uint32_t errors = 0;
-        test(collective, datatype, count, iterations, rank, size, &errors, offload_in, offload_out);
+        test(collective, datatype, count, iterations, dest, rank, size, true, &errors, offload_in, offload_out);
         uint32_t errors_sum;
         MPI_Reduce(&errors, &errors_sum, 1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
         return errors_sum;
@@ -224,7 +224,7 @@ int main(int argc, char **argv)
         using namespace std::chrono_literals;
         std::this_thread::sleep_for(1000ms);
 
-        for (Collective collective: {Collective::Bcast})
+        for (Collective collective: {Collective::P2P, Collective::Bcast})
         {
             for (Datatype datatype: {Datatype::Double})
             {
@@ -232,7 +232,17 @@ int main(int argc, char **argv)
                 {
                     std::cout << "testing collective: " << collective << ", datatype: " << datatype << std::endl;
                 }
-                test_kernel.run_test(collective, datatype, 64, 2);
+                if (collective == Collective::P2P)
+                {
+                    for (int dest = 1; dest < size; dest++)
+                    {
+                        test_kernel.run_test(collective, datatype, 64, 4, dest);
+                    }
+                }
+                else
+                {
+                    test_kernel.run_test(collective, datatype, 64, 4);
+                }
             }
         }
         if (rank == 0)
