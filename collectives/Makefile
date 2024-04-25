@@ -22,7 +22,7 @@ TARGET := hw
 
 .PHONY: all aurora xclbin clean
 
-all: offload_$(TARGET).xo test_$(TARGET).xo 
+all: rx_$(TARGET).xo tx_$(TARGET).xo offload_$(TARGET).xo test_$(TARGET).xo 
 
 aurora:
 	$(MAKE) -C ..
@@ -32,7 +32,13 @@ COMMFLAGS := --platform $(PLATFORM) --target $(TARGET) --save-temps --debug -DSY
 HLSCFLAGS := --compile $(COMMFLAGS)
 LINKFLAGS := --link --optimize 3 $(COMMFLAGS)
 
-offload_$(TARGET).xo: ./offload.cpp ./collectives.hpp
+rx_$(TARGET).xo: ./offload/rx.cpp ./collectives.hpp
+	v++ $(HLSCFLAGS) --temp_dir _x_test --kernel rx --output $@ $^
+
+tx_$(TARGET).xo: ./offload/tx.cpp ./collectives.hpp
+	v++ $(HLSCFLAGS) --temp_dir _x_test --kernel tx --output $@ $^
+
+offload_$(TARGET).xo: ./offload/offload.cpp ./collectives.hpp
 	v++ $(HLSCFLAGS) --temp_dir _x_offload --kernel offload --output $@ $^
 
 test_$(TARGET).xo: ./test.cpp ./collectives.hpp

@@ -19,7 +19,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/../emulation ${CMAKE_BINARY_DIR}/auroraemu)
 
-set(KERNEL_FILES ${CMAKE_SOURCE_DIR}/offload.cpp ${CMAKE_SOURCE_DIR}/test.cpp)
+set(KERNEL_FILES ${CMAKE_SOURCE_DIR}/offload/rx.cpp ${CMAKE_SOURCE_DIR}/offload/tx.cpp ${CMAKE_SOURCE_DIR}/offload/offload.cpp ${CMAKE_SOURCE_DIR}/test.cpp)
 set(SOURCE_FILES ${CMAKE_SOURCE_DIR}/main.cpp )
 
 find_package(MPI REQUIRED)

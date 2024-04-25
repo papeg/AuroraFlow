@@ -89,7 +89,7 @@ extern "C"
                 {
                     arc.bcast(double_data, count, 0);
                 }
-                *errors += compare_data(double_data, ref_data, count);
+                uint32_t errors = compare_data(double_data, ref_data, count);
             }
         }
     }
