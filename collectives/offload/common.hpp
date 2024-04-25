@@ -23,3 +23,17 @@ fork_array_loop:
         out_1.write(word);
     }
 }
+
+inline void fork_array_dest(stream_word_union_t &header, STREAM<stream_word> &in, STREAM<stream_word> &out_0, STREAM<stream_word> &out_1)
+{
+    out_0.write(header.word_data);
+    out_1.write(header.word_data);
+fork_array_loop:
+    for (uint32_t i = 0; i < header.header.count; i++)
+    {
+#pragma HLS pipeline II=1
+        stream_word word = in.read();
+        out_0.write(word);
+        out_1.write(word);
+    }
+}

@@ -94,12 +94,12 @@ collectives_header_t create_header(Collective collective, uint32_t count, uint32
 typedef union stream_word_union {
     stream_word_union(){};
     ~stream_word_union(){};
-    double double_data[8];
     float float_data[16];
-    int64_t int64_data[8];
-    uint64_t uint64_data[8];
+    double double_data[8];
     int32_t int32_data[16];
     uint32_t uint32_data[16];
+    int64_t int64_data[8];
+    uint64_t uint64_data[8];
     stream_word word_data;
     collectives_header_t header;
 } stream_word_union_t;

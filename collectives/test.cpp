@@ -22,75 +22,117 @@
 
 uint32_t count_max = 2048;
 
-void fill_data(double *data)
+template <typename T>
+void fill_data(T *data)
 {
-    double value = 1.0;
+    T value = 1;
 fill_data_loop:
     for (uint32_t i = 0; i < (count_max * 8); i++)
     {
 #pragma HLS pipeline off
         data[i] = value;
-        value *= 2.0;
+        value *= 2;
     }
 }
 
-void zero_data(double *data)
+
+template <typename T>
+void zero_data(T *data)
 {
-    double value = 1.0;
 zero_data_loop:
     for (uint32_t i = 0; i < (count_max * 8); i++)
     {
-        data[i] = 0.0;
+        data[i] = 0;
     }
 }
 
-uint32_t compare_data(double *data, double *ref, uint32_t count)
+template <typename T>
+uint32_t compare_data(bool check_errors, uint32_t collective, T *data, T *ref, uint32_t count, int rank, uint32_t dest = 0)
 {
     uint32_t errors = 0;
 compare_data_loop:
-    for (uint32_t i = 0; i < (count * 8); i++)
+    if (check_errors)
     {
-        if (data[i] != ref[i])
+        if ((collective == Collective::P2P) && (rank == dest)
+            || (collective == Collective::Bcast))
         {
-            errors += 1;
+            for (uint32_t i = 0; i < (count * 8); i++)
+            {
+                if (data[i] != ref[i])
+                {
+                    errors += 1;
+                }
+            }
+        #ifndef SYNTHESIS
+            printf("%u errors\n", errors);
+        #endif
         }
     }
-#ifndef SYNTHESIS
-    printf("%u errors\n", errors);
-#endif
     return errors;
+}
+
+template <typename T>
+void prepare_data(int rank, T *data, T *ref)
+{
+    fill_data<T>(ref);
+    if (rank == 0)
+    {
+        fill_data<T>(data);
+    }
+    else
+    {
+        zero_data<T>(data);
+    }
 }
 
 extern "C"
 {
-    void test(uint32_t collective, uint32_t datatype, uint32_t count, uint32_t iterations, int rank, int size, uint32_t *errors, STREAM<stream_word> &offload_in, STREAM<stream_word> &offload_out)
+    void test(uint32_t collective, uint32_t datatype, uint32_t count, uint32_t iterations, uint32_t dest, int rank, int size, bool check_errors, uint32_t *errors_out, STREAM<stream_word> &offload_in, STREAM<stream_word> &offload_out)
     {
         // test data
+        float float_data[count_max * 16];
+        float float_ref[count_max * 16];
         double double_data[count_max * 8];
-        double ref_data[count_max * 8];
-        fill_data(ref_data);
-        if (rank == 0)
-        {
-            fill_data(double_data);
-        }
-        else
-        {
-            zero_data(double_data);
-        }
+        double double_ref[count_max * 8];
 
-        *errors = 0;
+        int32_t int32_data[count_max * 16];
+        int32_t int32_ref[count_max * 16];
+        uint32_t uint32_data[count_max * 16];
+        uint32_t uint32_ref[count_max * 16];
+
+        int64_t int64_data[count_max * 8];
+        int64_t int64_ref[count_max * 8];
+        uint64_t uint64_data[count_max * 8];
+        uint64_t uint64_ref[count_max * 8];
+
+        uint32_t errors = 0;
         ARC arc(rank, size, offload_in, offload_out);
-        if (collective == Collective::Bcast)
+        for (uint32_t i = 0; i < iterations; i++)
         {
-            for (uint32_t i = 0; i < iterations; i++)
+            switch (datatype)
             {
-#pragma HLS pipeline off
-                if (datatype == Datatype::Double)
-                {
-                    arc.bcast(double_data, count, 0);
-                }
-                uint32_t errors = compare_data(double_data, ref_data, count);
+                case Datatype::Float:
+                    break;
+                case Datatype::Double:
+                    prepare_data(rank, double_data, double_ref);
+                    switch (collective)
+                    {
+                        case Collective::P2P:
+                            arc.p2p(double_data, count, 0, dest); 
+                            break;
+                        case Collective::Bcast:
+                            arc.bcast(double_data, count, 0);
+                            break;
+                    }
+                    errors += compare_data<double>(check_errors, collective, double_data, double_ref, count, rank, dest);
+                    break;
+                case Datatype::Int:
+                case Datatype::UnsignedInt:
+                case Datatype::Long:
+                case Datatype::UnsignedLong:
+                    break;
             }
         }
+        *errors_out = errors;
     }
 }
