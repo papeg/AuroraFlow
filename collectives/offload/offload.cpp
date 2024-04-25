@@ -29,19 +29,24 @@ public:
     Ring(int rank, int size) : rank(rank), size(size) {}
     int rank, size;
 
-    void get_bcast_dest(int &east, int &west)
+    int rank_west(int center)
     {
-        
+        return ((center + size - 1) % size);
     }
 
     int rank_west()
     {
-        return ((rank + size - 1) % size);
+        return rank_west(rank);
+    }
+
+    int rank_east(int center)
+    {
+        return ((center + 1) % size);
     }
 
     int rank_east()
     {
-        return ((rank + 1) % size);
+        return rank_east(rank);
     }
 
     bool go_west(uint32_t dest)
@@ -49,6 +54,16 @@ public:
         uint32_t distance_west = 1;
         uint32_t distance_east = 0;
         return distance_west < distance_east;
+    }
+
+    int furthest_rank(int center)
+    {
+        return ((center + (size / 2) + size) % size);
+    }
+
+    int furthest_rank()
+    {
+        return furthest_rank(rank);
     }
 };
 
@@ -97,8 +112,8 @@ extern "C"
                         stream_array(header, offload_in, ring_east_tx);
                         break;
                     case Collective::Bcast:
-                        header.header.dest = ring.rank_west();
-                        stream_array(header, offload_in, ring_east_tx);
+                        uint32_t furthest_rank = ring.furthest_rank();
+                        fork_array_dest(header, offload_in, ring_east_tx, furthest_rank, ring_west_tx, ring.rank_east(furthest_rank));
                         break;
                 }                
             }

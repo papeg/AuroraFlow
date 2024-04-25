@@ -24,11 +24,13 @@ fork_array_loop:
     }
 }
 
-inline void fork_array_dest(stream_word_union_t &header, STREAM<stream_word> &in, STREAM<stream_word> &out_0, STREAM<stream_word> &out_1)
+inline void fork_array_dest(stream_word_union_t &header, STREAM<stream_word> &in, STREAM<stream_word> &out_0, uint32_t dest_0, STREAM<stream_word> &out_1, uint32_t dest_1)
 {
+    header.header.dest = dest_0;
     out_0.write(header.word_data);
+    header.header.dest = dest_1;
     out_1.write(header.word_data);
-fork_array_loop:
+fork_array_dest_loop:
     for (uint32_t i = 0; i < header.header.count; i++)
     {
 #pragma HLS pipeline II=1
