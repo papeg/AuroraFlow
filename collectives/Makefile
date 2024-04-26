@@ -44,8 +44,8 @@ offload_$(TARGET).xo: ./offload/offload.cpp ./offload/common.hpp ./collectives.h
 test_$(TARGET).xo: ./test.cpp ./collectives.hpp
 	v++ $(HLSCFLAGS) --temp_dir _x_test --kernel test --output $@ $^
 
-collectives_test_hw.xclbin: aurora offload_hw.xo test_hw.xo link.cfg
-	v++ $(LINKFLAGS) --temp_dir _x_collectives_test --config link.cfg --output $@ ../aurora_hls_0.xo ../aurora_hls_1.xo offload_hw.xo test_hw.xo
+collectives_test_hw.xclbin: aurora offload_hw.xo test_hw.xo rx_hw.xo tx_hw.xo link.cfg
+	v++ $(LINKFLAGS) --temp_dir _x_collectives_test --config link.cfg --output $@ ../aurora_hls_0.xo ../aurora_hls_1.xo offload_hw.xo rx_hw.xo tx_hw.xo test_hw.xo
 
 xclbin: collectives_test_hw.xclbin
 
