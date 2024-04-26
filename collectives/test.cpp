@@ -40,7 +40,7 @@ template <typename T>
 void zero_data(T *data)
 {
 zero_data_loop:
-    for (uint32_t i = 0; i < (count_max * 8); i++)
+    for (uint32_t i = 0; i < (count_max * get_width<T>()); i++)
     {
         data[i] = 0;
     }
@@ -56,7 +56,7 @@ compare_data_loop:
         if ((collective == Collective::P2P) && (rank == dest)
             || (collective == Collective::Bcast))
         {
-            for (uint32_t i = 0; i < (count * 8); i++)
+            for (uint32_t i = 0; i < (count * get_width<T>()); i++)
             {
                 if (data[i] != ref[i])
                 {
