@@ -49,11 +49,19 @@ public:
         return rank_east(rank);
     }
 
+    uint32_t distance_west(uint32_t dest)
+    {
+        return (dest < rank) ? (rank - dest) : (rank + size - dest);
+    }
+
+    uint32_t distance_east(uint32_t dest)
+    {
+        return (dest > rank) ? (dest - rank) : (dest + size - rank);
+    }
+
     bool go_west(uint32_t dest)
     {
-        uint32_t distance_west = 1;
-        uint32_t distance_east = 0;
-        return distance_west < distance_east;
+        return distance_west(dest) < distance_east(dest);
     }
 
     int furthest_rank(int center)
@@ -108,8 +116,14 @@ extern "C"
                         ring_east_tx.write(header.word_data);
                         break;
                     case Collective::P2P:
-                        //TODO: calculate distance in both rings
-                        stream_array(header, offload_in, ring_east_tx);
+                        if (ring.go_west(header.header.dest))
+                        {
+                            stream_array(header, offload_in, ring_west_tx);
+                        }
+                        else
+                        {
+                            stream_array(header, offload_in, ring_east_tx);
+                        }
                         break;
                     case Collective::Bcast:
                         uint32_t furthest_rank = ring.furthest_rank();
