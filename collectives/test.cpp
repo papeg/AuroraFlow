@@ -50,12 +50,12 @@ template <typename T>
 uint32_t compare_data(bool check_errors, uint32_t collective, T *data, T *ref, uint32_t count, int rank, uint32_t dest = 0)
 {
     uint32_t errors = 0;
-compare_data_loop:
     if (check_errors)
     {
-        if ((collective == Collective::P2P) && (rank == dest)
+        if (((collective == Collective::P2P) && (rank == dest))
             || (collective == Collective::Bcast))
         {
+compare_data_loop:
             for (uint32_t i = 0; i < (count * get_width<T>()); i++)
             {
                 if (data[i] != ref[i])
