@@ -27,7 +27,7 @@ void fill_data(T *data)
 {
     T value = 1;
 fill_data_loop:
-    for (uint32_t i = 0; i < (count_max * 8); i++)
+    for (uint32_t i = 0; i < (count_max * get_width<T>()); i++)
     {
 #pragma HLS pipeline off
         data[i] = value;
@@ -114,11 +114,11 @@ extern "C"
                 case Datatype::Float:
                     break;
                 case Datatype::Double:
-                    prepare_data(rank, double_data, double_ref);
+                    prepare_data<double>(rank, double_data, double_ref);
                     switch (collective)
                     {
                         case Collective::P2P:
-                            arc.p2p(double_data, count, 0, dest); 
+                            arc.p2p(double_data, count, 0, dest);
                             break;
                         case Collective::Bcast:
                             arc.bcast(double_data, count, 0);
@@ -127,6 +127,18 @@ extern "C"
                     errors += compare_data<double>(check_errors, collective, double_data, double_ref, count, rank, dest);
                     break;
                 case Datatype::Int:
+                    prepare_data<int32_t>(rank, int32_data, int32_ref);
+                    switch (collective)
+                    {
+                        case Collective::P2P:
+                            arc.p2p(int32_data, count, 0, dest);
+                            break;
+                        case Collective::Bcast:
+                            arc.bcast(int32_data, count, 0);
+                            break;
+                    }
+                    errors += compare_data<int32_t>(check_errors, collective, int32_data, int32_ref, count, rank, dest);
+                    break;
                 case Datatype::UnsignedInt:
                 case Datatype::Long:
                 case Datatype::UnsignedLong:
