@@ -274,7 +274,7 @@ int main(int argc, char **argv)
 
         for (Collective collective: {Collective::P2P, Collective::Bcast})
         {
-            for (Datatype datatype: {Datatype::Double})
+            for (Datatype datatype: {Datatype::Int})
             {
                 if (rank == 0)
                 {
@@ -302,8 +302,12 @@ int main(int argc, char **argv)
     }
     else
     {
+        char* hostname;
+        hostname = new char[100];
+        gethostname(hostname, 100);
         uint32_t errors_per_rank = 0;
         xrt::device device(rank % 3);
+        std::cout << "programming device " << rank % 3 << " on rank " << rank << " and host " << hostname << std::endl;
         xrt::uuid xclbin_uuid = device.load_xclbin("collectives_test_hw.xclbin");
         AuroraRing aurora_ring(device, xclbin_uuid);
         if (aurora_ring.check_core_status_global(3000, rank, size))
@@ -313,8 +317,8 @@ int main(int argc, char **argv)
         HardwareTestKernel test_kernel(rank, size, device, xclbin_uuid);
 
         uint32_t iterations = 1;
-        uint32_t count_max = 2048;
-        for (Collective collective: {/*Collective::P2P,*/ Collective::Bcast})
+        uint32_t count_max = 1;
+        for (Collective collective: {Collective::P2P, Collective::Bcast})
         {
             for (Datatype datatype: {Datatype::Double})
             {
@@ -324,6 +328,10 @@ int main(int argc, char **argv)
                     {
                         for (int dest = 1; dest < size; dest++)
                         {
+                            if (rank == 0)
+                            {
+                                std::cout << "testing collective: " << collective << ", datatype: " << datatype << ", count: " << count << ", dest: " << dest << std::endl;
+                            }
                             uint32_t errors = test_kernel.run_test(collective, datatype, count, iterations, dest);
                             std::cout << "errors: " << errors << std::endl;
                             errors_per_rank += errors;
