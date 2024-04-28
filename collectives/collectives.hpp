@@ -190,6 +190,7 @@ inline void write_array(STREAM<stream_word> &out, T *values, uint32_t count)
 write_array_loop:
     for (uint32_t i = 0; i < count; i += 2)
     {
+#pragma HLS protocol fixed
 #pragma HLS pipeline II=2
 // not enough memory ports for II=1
         stream_word_union_t data_0;
