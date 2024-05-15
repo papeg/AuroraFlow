@@ -316,6 +316,14 @@ int main(int argc, char **argv)
         }
         HardwareTestKernel test_kernel(rank, size, device, xclbin_uuid);
 
+        if (rank == 0)
+        {
+            // spin until debug_hw is ready
+            std::cout << "waiting for letsgo file" << std::endl;
+            while (rename("letsgo", "started") != 0) {}
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+
         uint32_t iterations = 1;
         uint32_t count_max = 1;
         for (Collective collective: {Collective::P2P, Collective::Bcast})
