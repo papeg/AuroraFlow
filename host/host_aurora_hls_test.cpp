@@ -14,19 +14,14 @@
  * limitations under the License.
  */
 
+#include "Aurora.hpp"
 #include "experimental/xrt_kernel.h"
 #include "experimental/xrt_ip.h"
-#include <iostream>
-#include <iomanip>
 #include <fstream>
-#include <bitset>
-#include <cmath>
 #include <unistd.h>
 #include <vector>
 #include <thread>
-#include <omp.h>
 #include <mpi.h>
-#include "Aurora.hpp"
 
 class Configuration
 {
@@ -352,6 +347,31 @@ void wait_for_enter()
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 }
 
+void check_core_status_global(Aurora &aurora, size_t timeout_ms, int world_rank, int world_size)
+{
+    bool local_core_ok;
+
+    // barrier so timeout is working for all configurations 
+    MPI_Barrier(MPI_COMM_WORLD);
+    local_core_ok = aurora.core_status_ok(3000);
+
+    bool core_ok[world_size];
+    MPI_Gather(&local_core_ok, 1, MPI_CXX_BOOL, core_ok, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+
+    if (world_rank == 0) {
+        int errors = 0;       
+        for (int i = 0; i < world_size; i++) {
+            if (!core_ok[i]) {
+                std::cout << "problem with core " << i % 2 << " on rank " << i << std::endl;
+                errors += 1;
+            }
+        }
+        if (errors) {
+            MPI_Abort(MPI_COMM_WORLD, errors);
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
     Configuration config(argc, argv);
@@ -386,18 +406,18 @@ int main(int argc, char *argv[])
         wait_for_enter();
     }
 
-    // create kernel objects
-    IssueKernel issue(instance, device, xclbin_uuid, config);
-    DumpKernel dump(instance, device, xclbin_uuid, config);
-    
     Aurora aurora;
     if (!emulation) {
         aurora = Aurora(instance, device, xclbin_uuid);
-        aurora.check_core_status_global(config.timeout_ms, world_rank, world_size);
+        check_core_status_global(aurora, config.timeout_ms, world_rank, world_size);
         if (!aurora.has_framing()) {
             config.frame_size = 0; 
         }
     }
+
+    // create kernel objects
+    IssueKernel issue(instance, device, xclbin_uuid, config);
+    DumpKernel dump(instance, device, xclbin_uuid, config);
 
     double local_transmission_times[config.repetitions];
     for (uint32_t r = 0; r < config.repetitions; r++) {
@@ -412,7 +432,10 @@ int main(int argc, char *argv[])
 
             std::this_thread::sleep_for(std::chrono::seconds(10));
             aurora.print_fifo_status();
-            std::cout << "Frames received before starting dump kernel: " << aurora.get_frames_received() << std::endl;
+            if (aurora.has_framing())
+            {
+                std::cout << "Frames received before starting dump kernel: " << aurora.get_frames_received() << std::endl;
+            }
         }
         MPI_Barrier(MPI_COMM_WORLD);        
 
@@ -430,7 +453,7 @@ int main(int argc, char *argv[])
 
         if (dump.timeout()) {
             if (!emulation) {
-                aurora.print_core_status("dump timeout");
+                aurora.print_core_status();
             }
             rx_success = false;
         } else {
@@ -486,8 +509,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("Total frames received: %d\n", aurora.get_frames_received());
-    printf("Frames with errors: %d\n", aurora.get_frames_with_errors());
+    if (aurora.has_framing())
+    {
+        std::cout << "Total frames received: " << aurora.get_frames_received() << std::endl;
+        std::cout << "Frames with errors: " << aurora.get_frames_with_errors() << std::endl;
+    }
 
     MPI_Finalize();
 }
