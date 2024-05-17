@@ -2,6 +2,9 @@
 #include <thread>
 #include <chrono>
 #include <memory>
+#include <fstream>
+#include <sstream>
+#include <unistd.h>
 
 #include "../host/Aurora.hpp"
 
@@ -27,12 +30,36 @@ inline std::string aurora_id(size_t rank, size_t port)
     return identifier.str();
 }
 
+std::string get_xclbin_path(std::string xcl_emulation_mode)
+{
+    std::stringstream path;
+    path << "collectives_test_" << xcl_emulation_mode << ".xclbin";
+    return path.str();
+}
+
+std::string construct_name(std::string base, std::string append, std::string xcl_emulation_mode, int rank)
+{
+    std::stringstream name;
+    name << base << ":{" << base;
+    if (append != "")
+    {
+        name << "_" << append;
+    }
+    if (xcl_emulation_mode == "hw_emu")
+    {
+        name << "_" << rank;
+    }
+    name << "}";
+    return name.str();
+}
 
 class AuroraRing
 {
 public:
     AuroraRing(xrt::device &device, xrt::uuid &xclbin_uuid)
         : core_0(Aurora(0, device, xclbin_uuid)), core_1(Aurora(1, device, xclbin_uuid)) {}
+
+    AuroraRing() {}
 
     int check_core_status_global(size_t timeout_ms, int world_rank, int world_size)
     {
@@ -74,10 +101,10 @@ public:
 class HardwareTestKernel: public TestKernel
 {
 public:
-    HardwareTestKernel(int rank, int size, xrt::device &device, xrt::uuid &xclbin_uuid) :
+    HardwareTestKernel(int rank, int size, xrt::device &device, xrt::uuid &xclbin_uuid, std::string xcl_emulation_mode) :
         TestKernel(rank, size)
     {
-        rx_east_kernel = xrt::kernel(device, xclbin_uuid, "rx:{rx_east}");
+        rx_east_kernel = xrt::kernel(device, xclbin_uuid, construct_name("rx", "east", xcl_emulation_mode, rank));
         rx_east_run = xrt::run(rx_east_kernel);
 
         rx_east_run.set_arg(0, rank);
@@ -85,7 +112,7 @@ public:
 
         rx_east_run.start();
 
-        rx_west_kernel = xrt::kernel(device, xclbin_uuid, "rx:{rx_west}");
+        rx_west_kernel = xrt::kernel(device, xclbin_uuid, construct_name("rx", "west", xcl_emulation_mode, rank));
         rx_west_run = xrt::run(rx_west_kernel);
 
         rx_west_run.set_arg(0, rank);
@@ -93,7 +120,7 @@ public:
 
         rx_west_run.start();
 
-        tx_east_kernel = xrt::kernel(device, xclbin_uuid, "tx:{tx_east}");
+        tx_east_kernel = xrt::kernel(device, xclbin_uuid, construct_name("tx", "east", xcl_emulation_mode, rank));
         tx_east_run = xrt::run(tx_east_kernel);
 
         tx_east_run.set_arg(0, rank);
@@ -101,7 +128,7 @@ public:
 
         tx_east_run.start();
 
-        tx_west_kernel = xrt::kernel(device, xclbin_uuid, "tx:{tx_west}");
+        tx_west_kernel = xrt::kernel(device, xclbin_uuid, construct_name("tx", "east", xcl_emulation_mode, rank));
         tx_west_run = xrt::run(tx_west_kernel);
 
         tx_west_run.set_arg(0, rank);
@@ -109,7 +136,7 @@ public:
 
         tx_west_run.start();
 
-        offload_kernel = xrt::kernel(device, xclbin_uuid, "offload");
+        offload_kernel = xrt::kernel(device, xclbin_uuid, construct_name("offload", "", xcl_emulation_mode, rank));
         offload_run = xrt::run(offload_kernel);
 
         offload_run.set_arg(0, rank);
@@ -117,7 +144,7 @@ public:
 
         offload_run.start();
 
-        test_kernel = xrt::kernel(device, xclbin_uuid, "test");
+        test_kernel = xrt::kernel(device, xclbin_uuid, construct_name("test", "", xcl_emulation_mode, rank));
         test_run = xrt::run(test_kernel);
 
         test_run.set_arg(5, rank);
@@ -256,9 +283,13 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD , &rank);
     MPI_Comm_size(MPI_COMM_WORLD , &size);
 
-    bool emulation = (std::getenv("XCL_EMULATION_MODE") != nullptr);
+    std::string xcl_emulation_mode = "hw";
+    if (std::getenv("XCL_EMULATION_MODE") != nullptr)
+    {
+        xcl_emulation_mode = std::string(std::getenv("XCL_EMULATION_MODE"));
+    }
 
-    if (emulation)
+    if (xcl_emulation_mode == "sw_emu")
     {
         SoftwareTestKernel test_kernel(rank, size);
 
@@ -306,15 +337,24 @@ int main(int argc, char **argv)
         hostname = new char[100];
         gethostname(hostname, 100);
         uint32_t errors_per_rank = 0;
-        xrt::device device(rank % 3);
-        std::cout << "programming device " << rank % 3 << " on rank " << rank << " and host " << hostname << std::endl;
-        xrt::uuid xclbin_uuid = device.load_xclbin("collectives_test_hw.xclbin");
-        AuroraRing aurora_ring(device, xclbin_uuid);
-        if (aurora_ring.check_core_status_global(3000, rank, size))
-        {
-            MPI_Abort(MPI_COMM_WORLD, rank);
+
+        uint32_t device_id = xcl_emulation_mode == "hw_emu" ? 0 : rank % 3;
+        xrt::device device(device_id);
+        std::cout << "programming device " << device_id << " on rank " << rank << " and host " << hostname << std::endl;
+
+        std::string xclbin_path = get_xclbin_path(xcl_emulation_mode);
+        xrt::uuid xclbin_uuid = device.load_xclbin(xclbin_path);
+
+        AuroraRing aurora_ring;
+        if (xcl_emulation_mode == "hw")
+        { 
+            aurora_ring = AuroraRing(device, xclbin_uuid);
+            if (aurora_ring.check_core_status_global(3000, rank, size))
+            {
+                MPI_Abort(MPI_COMM_WORLD, rank);
+            }
         }
-        HardwareTestKernel test_kernel(rank, size, device, xclbin_uuid);
+        HardwareTestKernel test_kernel(rank, size, device, xclbin_uuid, xcl_emulation_mode);
 
         if (rank == 0)
         {
