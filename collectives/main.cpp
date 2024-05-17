@@ -40,8 +40,8 @@ public:
 
         // barrier so timeout is working for all configurations
         MPI_Barrier(MPI_COMM_WORLD);
-        local_core_status[0] = core_0.check_core_status(3000);
-        local_core_status[1] = core_1.check_core_status(3000);
+        local_core_status[0] = core_0.core_status_ok(3000);
+        local_core_status[1] = core_1.core_status_ok(3000);
 
         int core_status[2 * world_size];
         MPI_Gather(local_core_status, 2, MPI_INT, core_status, 2, MPI_INT, 0, MPI_COMM_WORLD);
@@ -49,7 +49,7 @@ public:
         int errors = 0;
         if (world_rank == 0) {
             for (int i = 0; i < 2 * world_size; i++) {
-                if (core_status[i] > 0) {
+                if (core_status[i] == 0) {
                     std::cout << "problem with core " << i % 2 << " on rank " << i / 2 << std::endl;
                     errors += 1;
                 }
