@@ -35,13 +35,32 @@
 #define DEST_WIDTH 0
 
 typedef ap_axiu<DATA_WIDTH, 0, 0, DEST_WIDTH> stream_word;
-typedef ap_axiu<32, 0, 0, 0> command_word;
 
-enum Collective {Barrier, P2P, Bcast, Reduce, Scatter, Gather};
+enum Collective
+{
+    Barrier = 0,
+    P2P     = 1,
+    Bcast   = 2,
+    Reduce  = 3,
+    Scatter = 4,
+    Gather  = 5
+};
 
-enum Datatype {Float, Double, Int, UnsignedInt, Long, UnsignedLong};
+enum Datatype {
+    Float        = 0,
+    Double       = 1,
+    Int          = 2,
+    UnsignedInt  = 3,
+    Long         = 4,
+    UnsignedLong = 5
+};
 
-enum ReduceOp {Sum, Max, Min, Prod};
+enum ReduceOp {
+    Sum  = 0,
+    Max  = 1,
+    Min  = 2,
+    Prod = 3
+};
 
 typedef struct collectives_header {
     uint32_t collective;
