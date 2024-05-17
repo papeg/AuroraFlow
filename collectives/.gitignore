@@ -2,3 +2,4 @@ build
 letsgo
 started
 emconfig*
+*.run_summary
