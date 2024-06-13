@@ -28,18 +28,16 @@ extern "C"
         STREAM<stream_word> &ring_out,
         STREAM<stream_word> &offload_in)
     {
+#pragma HLS stable variable=rank
+#pragma HLS stable variable=size
         stream_word_union_t header;
-        while (true)
+        if (ring_in.read_nb(header.word_data))
         {
-            if (ring_in.read_nb(header.word_data))
-            {
-                stream_array(header, ring_in, ring_out);
-            }
-            if (offload_in.read_nb(header.word_data))
-            {
-                stream_array(header, offload_in, ring_out);
-            }
+            stream_array(header, ring_in, ring_out);
+        }
+        if (offload_in.read_nb(header.word_data))
+        {
+            stream_array(header, offload_in, ring_out);
         }
     }
 }
- 

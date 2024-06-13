@@ -82,55 +82,54 @@ extern "C"
         STREAM<stream_word> &ring_west_rx, STREAM<stream_word> &ring_west_tx,
         STREAM<stream_word> &offload_in, STREAM<stream_word> &offload_out)
     {
+#pragma HLS stable variable=rank
+#pragma HLS stable variable=size
         Ring ring(rank, size);
-        while (true)
+        stream_word_union_t header;
+        if (ring_east_rx.read_nb(header.word_data))
         {
-            stream_word_union_t header;
-            if (ring_east_rx.read_nb(header.word_data))
+            switch (header.header.collective)
             {
-                switch (header.header.collective)
-                {
-                    case Collective::Barrier: 
-                    case Collective::P2P:
-                    case Collective::Bcast:
-                        stream_array(header, ring_east_rx, offload_out); 
-                        break;
-                }
+                case Collective::Barrier: 
+                case Collective::P2P:
+                case Collective::Bcast:
+                    stream_array(header, ring_east_rx, offload_out); 
+                    break;
             }
-            if (ring_west_rx.read_nb(header.word_data))
+        }
+        if (ring_west_rx.read_nb(header.word_data))
+        {
+            switch (header.header.collective)
             {
-                switch (header.header.collective)
-                {
-                    case Collective::Barrier: 
-                    case Collective::P2P:
-                    case Collective::Bcast:
-                        stream_array(header, ring_west_rx, offload_out); 
-                        break;
-                }
+                case Collective::Barrier: 
+                case Collective::P2P:
+                case Collective::Bcast:
+                    stream_array(header, ring_west_rx, offload_out); 
+                    break;
             }
-            if (offload_in.read_nb(header.word_data))
+        }
+        if (offload_in.read_nb(header.word_data))
+        {
+            switch (header.header.collective)
             {
-                switch (header.header.collective)
-                {
-                    case Collective::Barrier: 
-                        ring_east_tx.write(header.word_data);
-                        break;
-                    case Collective::P2P:
-                        if (ring.go_west(header.header.dest))
-                        {
-                            stream_array(header, offload_in, ring_west_tx);
-                        }
-                        else
-                        {
-                            stream_array(header, offload_in, ring_east_tx);
-                        }
-                        break;
-                    case Collective::Bcast:
-                        uint32_t furthest_rank = ring.furthest_rank();
-                        fork_array_dest(header, offload_in, ring_east_tx, furthest_rank, ring_west_tx, ring.rank_east(furthest_rank));
-                        break;
-                }                
-            }
+                case Collective::Barrier: 
+                    ring_east_tx.write(header.word_data);
+                    break;
+                case Collective::P2P:
+                    if (ring.go_west(header.header.dest))
+                    {
+                        stream_array(header, offload_in, ring_west_tx);
+                    }
+                    else
+                    {
+                        stream_array(header, offload_in, ring_east_tx);
+                    }
+                    break;
+                case Collective::Bcast:
+                    uint32_t furthest_rank = ring.furthest_rank();
+                    fork_array_dest(header, offload_in, ring_east_tx, furthest_rank, ring_west_tx, ring.rank_east(furthest_rank));
+                    break;
+            }                
         }
     }
 }

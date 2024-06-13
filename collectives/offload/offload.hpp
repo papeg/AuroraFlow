@@ -18,7 +18,7 @@
 extern "C"
 {
     void offload(int rank, int size,
-        STREAM<stream_word> &ring_0_in, STREAM<stream_word> &ring_0_out,
-        STREAM<stream_word> &ring_1_in, STREAM<stream_word> &ring_1_out,
+        STREAM<stream_word> &ring_east_rx, STREAM<stream_word> &ring_east_tx,
+        STREAM<stream_word> &ring_west_rx, STREAM<stream_word> &ring_west_tx,
         STREAM<stream_word> &offload_in, STREAM<stream_word> &offload_out);
 }

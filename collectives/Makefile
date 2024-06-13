@@ -36,25 +36,16 @@ COMMFLAGS := --platform $(PLATFORM) --target $(TARGET) --save-temps --debug -DSY
 HLSCFLAGS := --compile $(COMMFLAGS)
 LINKFLAGS := --link --optimize 3 $(COMMFLAGS)
 
-rx_$(TARGET).xo: ./offload/rx.cpp ./offload/common.hpp ./collectives.hpp
-	v++ $(HLSCFLAGS) --temp_dir _x_test_$(TARGET) --kernel rx --output $@ $^
-
-tx_$(TARGET).xo: ./offload/tx.cpp ./offload/common.hpp ./collectives.hpp
-	v++ $(HLSCFLAGS) --temp_dir _x_test_$(TARGET) --kernel tx --output $@ $^
-
-offload_$(TARGET).xo: ./offload/offload.cpp ./offload/common.hpp ./collectives.hpp
-	v++ $(HLSCFLAGS) --temp_dir _x_offload_$(TARGET) --kernel offload --output $@ $^
+arc_$(TARGET).xo: ./offload/arc.cpp ./offload/offload.cpp ./offload/rx.cpp ./offload/tx.cpp ./offload/common.hpp ./collectives.hpp
+	v++ $(HLSCFLAGS) --temp_dir _x_arc_$(TARGET) --kernel arc --output $@ $^
 
 test_$(TARGET).xo: ./test.cpp ./collectives.hpp
 	v++ $(HLSCFLAGS) --temp_dir _x_test_$(TARGET) --kernel test --output $@ $^
 
-collectives_test_hw.xclbin: aurora offload_hw.xo test_hw.xo rx_hw.xo tx_hw.xo link.cfg
-	v++ $(LINKFLAGS) --temp_dir _x_collectives_test_hw --config link.cfg --output $@ ../aurora_hls_0.xo ../aurora_hls_1.xo offload_hw.xo rx_hw.xo tx_hw.xo test_hw.xo
+collectives_test_hw.xclbin: aurora arc_hw.xo test_hw.xo link.cfg
+	v++ $(LINKFLAGS) --temp_dir _x_collectives_test_hw --config link.cfg --output $@ ../aurora_hls_0.xo ../aurora_hls_1.xo arc_hw.xo test_hw.xo
 
-collectives_test_sw_emu.xclbin: offload_sw_emu.xo test_sw_emu.xo rx_sw_emu.xo tx_sw_emu.xo link_emu.cfg
-	v++ $(LINKFLAGS) --temp_dir _x_collectives_test_sw_emu --config link_emu.cfg --output $@ offload_sw_emu.xo rx_sw_emu.xo tx_sw_emu.xo test_sw_emu.xo
-
-collectives_test_hw_emu.xclbin: emconfig.json offload_hw_emu.xo test_hw_emu.xo rx_hw_emu.xo tx_hw_emu.xo link_emu.cfg
+collectives_test_hw_emu.xclbin: emconfig.json arc_hw_emu.xo test_hw_emu.xo link_emu.cfg
 	v++ $(LINKFLAGS) --temp_dir _x_collectives_test_hw_emu --config link_emu.cfg --output $@ offload_hw_emu.xo rx_hw_emu.xo tx_hw_emu.xo test_hw_emu.xo
 
 xclbin: collectives_test_$(TARGET).xclbin

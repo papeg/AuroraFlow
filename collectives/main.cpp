@@ -106,38 +106,6 @@ public:
     HardwareTestKernel(int rank, int size, xrt::device &device, xrt::uuid &xclbin_uuid, std::string xcl_emulation_mode) :
         TestKernel(rank, size)
     {
-        rx_east_kernel = xrt::kernel(device, xclbin_uuid, construct_name("rx", "east", xcl_emulation_mode, rank));
-        rx_east_run = xrt::run(rx_east_kernel);
-
-        rx_east_run.set_arg(0, rank);
-        rx_east_run.set_arg(1, size);
-
-        rx_east_run.start();
-
-        rx_west_kernel = xrt::kernel(device, xclbin_uuid, construct_name("rx", "west", xcl_emulation_mode, rank));
-        rx_west_run = xrt::run(rx_west_kernel);
-
-        rx_west_run.set_arg(0, rank);
-        rx_west_run.set_arg(1, size);
-
-        rx_west_run.start();
-
-        tx_east_kernel = xrt::kernel(device, xclbin_uuid, construct_name("tx", "east", xcl_emulation_mode, rank));
-        tx_east_run = xrt::run(tx_east_kernel);
-
-        tx_east_run.set_arg(0, rank);
-        tx_east_run.set_arg(1, size);
-
-        tx_east_run.start();
-
-        tx_west_kernel = xrt::kernel(device, xclbin_uuid, construct_name("tx", "east", xcl_emulation_mode, rank));
-        tx_west_run = xrt::run(tx_west_kernel);
-
-        tx_west_run.set_arg(0, rank);
-        tx_west_run.set_arg(1, size);
-
-        tx_west_run.start();
-
         offload_kernel = xrt::kernel(device, xclbin_uuid, construct_name("offload", "", xcl_emulation_mode, rank));
         offload_run = xrt::run(offload_kernel);
 
@@ -215,9 +183,7 @@ public:
     }
 
     xrt::kernel test_kernel, offload_kernel;
-    xrt::kernel rx_east_kernel, rx_west_kernel, tx_east_kernel, tx_west_kernel;
     xrt::run test_run, offload_run;
-    xrt::run rx_east_run, rx_west_run, tx_east_run, tx_west_run;
     xrt::bo errors_bo;
     std::string metrics;
 };
@@ -261,16 +227,16 @@ public:
     }
 
     std::optional<AuroraEmuSwitch> aurora_switch;
-    STREAM<stream_word> rx_east_ring_in;
+    STREAM<interface_stream_word> rx_east_ring_in;
     STREAM<stream_word> rx_east_ring_out;
     STREAM<stream_word> rx_east_offload_out;
-    STREAM<stream_word> rx_west_ring_in;
+    STREAM<interface_stream_word> rx_west_ring_in;
     STREAM<stream_word> rx_west_ring_out;
     STREAM<stream_word> rx_west_offload_out;
 
-    STREAM<stream_word> tx_east_ring_out;
+    STREAM<interface_stream_word> tx_east_ring_out;
     STREAM<stream_word> tx_east_offload_in;
-    STREAM<stream_word> tx_west_ring_out;
+    STREAM<interface_stream_word> tx_west_ring_out;
     STREAM<stream_word> tx_west_offload_in;
 
     STREAM<stream_word> offload_in;
@@ -303,6 +269,7 @@ int main(int argc, char **argv)
 
     if (xcl_emulation_mode == "sw_emu")
     {
+        /*
         SoftwareTestKernel test_kernel(rank, size);
 
         std::thread offload_kernel(offload, rank, size, std::ref(test_kernel.rx_east_offload_out), std::ref(test_kernel.tx_east_offload_in), std::ref(test_kernel.rx_west_offload_out), std::ref(test_kernel.tx_west_offload_in), std::ref(test_kernel.offload_in), std::ref(test_kernel.offload_out));
@@ -342,6 +309,7 @@ int main(int argc, char **argv)
         }
         // no way to terminate thread right now, exit by hand here
         offload_kernel.join();
+        */
     }
     else
     {

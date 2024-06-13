@@ -29,34 +29,32 @@ extern "C"
         STREAM<stream_word> &ring_out,
         STREAM<stream_word> &offload_out)
     {
+#pragma HLS stable variable=rank
+#pragma HLS stable variable=size
         stream_word_union_t header;
-        while (true)
+        header.word_data = ring_in.read();    
+        switch (header.header.collective)
         {
-            header.word_data = ring_in.read();    
-            switch (header.header.collective)
-            {
-                case Collective::P2P:
-                    if (header.header.dest == rank)
-                    {
-                        stream_array(header, ring_in, offload_out);
-                    }
-                    else
-                    {
-                        stream_array(header, ring_in, ring_out);
-                    }
-                    break;
-                case Collective::Bcast:
-                    if (header.header.dest == rank)
-                    {
-                        stream_array(header, ring_in, offload_out);
-                    }
-                    else
-                    {
-                        fork_array(header, ring_in, ring_out, offload_out);
-                    }
-                    break;
-            }
+            case Collective::P2P:
+                if (header.header.dest == rank)
+                {
+                    stream_array(header, ring_in, offload_out);
+                }
+                else
+                {
+                    stream_array(header, ring_in, ring_out);
+                }
+                break;
+            case Collective::Bcast:
+                if (header.header.dest == rank)
+                {
+                    stream_array(header, ring_in, offload_out);
+                }
+                else
+                {
+                    fork_array(header, ring_in, ring_out, offload_out);
+                }
+                break;
         }
     }
 }
- 

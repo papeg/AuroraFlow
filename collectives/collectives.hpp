@@ -34,7 +34,8 @@
 #define DATA_WIDTH 512
 #define DEST_WIDTH 0
 
-typedef ap_axiu<DATA_WIDTH, 0, 0, DEST_WIDTH> stream_word;
+typedef ap_axiu<DATA_WIDTH, 0, 0, DEST_WIDTH> interface_stream_word;
+typedef ap_uint<DATA_WIDTH> stream_word;
 
 enum Collective
 {
