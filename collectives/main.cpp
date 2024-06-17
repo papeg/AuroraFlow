@@ -106,13 +106,15 @@ public:
     HardwareTestKernel(int rank, int size, xrt::device &device, xrt::uuid &xclbin_uuid, std::string xcl_emulation_mode) :
         TestKernel(rank, size)
     {
-        offload_kernel = xrt::kernel(device, xclbin_uuid, construct_name("offload", "", xcl_emulation_mode, rank));
+        /*
+        offload_kernel = xrt::ip(device, xclbin_uuid, construct_name("arc", "", xcl_emulation_mode, rank));
         offload_run = xrt::run(offload_kernel);
 
         offload_run.set_arg(0, rank);
         offload_run.set_arg(1, size);
 
         offload_run.start();
+        */
 
         test_kernel = xrt::kernel(device, xclbin_uuid, construct_name("test", "", xcl_emulation_mode, rank));
         test_run = xrt::run(test_kernel);
@@ -182,7 +184,7 @@ public:
         return std::thread(&HardwareTestKernel::run_test, this, collective, datatype, count, iterations, dest);
     }
 
-    xrt::kernel test_kernel, offload_kernel;
+    xrt::kernel test_kernel;
     xrt::run test_run, offload_run;
     xrt::bo errors_bo;
     std::string metrics;
