@@ -35,21 +35,15 @@ extern "C"
                     bool ack_enable,
                     hls::stream<ap_axiu<1, 0, 0, 0>>& ack_stream)
     {
-        const bool framing = frame_size != 0;
-        const unsigned int num_frames = framing ? (byte_size / PTR_BYTE_WIDTH / frame_size) : 1;
-        const unsigned int iterations_per_frame = framing ? frame_size : (byte_size / PTR_BYTE_WIDTH);
+        int chunks = byte_size / PTR_BYTE_WIDTH;
         for (unsigned int n = 0; n < iterations; n++) {
-            for (int frame = 0; frame < num_frames; frame++) {
-                for (int i = 0; i < iterations_per_frame; i++) {
-                    #pragma HLS PIPELINE II = 1
-                    ap_axiu<PTR_WIDTH, 0, 0, 0> temp;
-                    temp.data = data_input[frame * iterations_per_frame + i];
-                    if (framing) {
-                        temp.keep = -1;
-                        temp.last = (i == (frame_size - 1));
-                    }
-                    data_output.write(temp);
-                }
+            for (int i = 0; i < chunks; i++) {
+                #pragma HLS PIPELINE II = 1
+                ap_axiu<PTR_WIDTH, 0, 0, 0> temp;
+                temp.data = data_input[i];
+                temp.last = (frame_size != 0) && (((i + 1) % frame_size) == 0);
+                temp.keep = -1;
+                data_output.write(temp);
             }
             if (ack_enable) {
                 ap_axiu<1, 0, 0, 0> ack = ack_stream.read();

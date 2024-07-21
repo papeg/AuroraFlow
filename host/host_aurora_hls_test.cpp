@@ -411,8 +411,9 @@ int main(int argc, char *argv[])
         aurora = Aurora(instance, device, xclbin_uuid);
         check_core_status_global(aurora, config.timeout_ms, world_rank, world_size);
         if (!aurora.has_framing()) {
-            config.frame_size = 0; 
+            config.frame_size = 0;
         }
+        aurora.print_configuration();
     }
 
     // create kernel objects
@@ -432,10 +433,6 @@ int main(int argc, char *argv[])
 
             std::this_thread::sleep_for(std::chrono::seconds(10));
             aurora.print_fifo_status();
-            if (aurora.has_framing())
-            {
-                std::cout << "Frames received before starting dump kernel: " << aurora.get_frames_received() << std::endl;
-            }
         }
         MPI_Barrier(MPI_COMM_WORLD);        
 

@@ -90,6 +90,8 @@ public:
         // read constant configuration information
         uint32_t configuration = ip.read_register(CONFIGURATION_ADDRESS);
 
+        std::cout << std::hex << configuration << std::endl;
+
         has_tkeep = (configuration & HAS_TKEEP);
         has_tlast = (configuration & HAS_TLAST) >> 1;
         fifo_width = (configuration & FIFO_WIDTH) >> 2;
