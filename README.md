@@ -54,6 +54,20 @@ Use the following command to enable the debug probe for the NFC module:
 make aurora PROBE_NFC=1
 ```
 
+The FIFO on the transceiving side can be configured the same way as the FIFO on the RX side, but has smaller default values.
+
+```
+  make aurora TX_FIFO_DEPTH=128 TX_FIFO_PROG_FULL=96 TX_FIFO_PROG_EMPTY=32
+```
+
+The threshold signals serve no functional purpose except for status reporting. When there is a larger FIFO needed, it is sufficient and cleaner to add a FIFO to the AXI connection on the link level.
+
+```
+stream_connect=issue_1.data_output:aurora_hls_1.tx_axis:256
+```
+
+All 8 FIFO status signals can be read from the host code, described in the examples in "How to use it".
+
 ### Configure FIFO width
 
 By default the FIFO and therefore the streams for input and output have a width of 64 bytes. This is the width which is also needed to reach the maximum throughput of 100Gbit/s. If you have a special application which needs another width, this is also configurable. But be careful, because other sizes have not been tested.
@@ -114,6 +128,9 @@ if (frames_with_errors > 0) {
 
 // get a print of the configuration of the core
 aurora.print_configuration();
+
+// get a print of all the FIFO status signals
+aurora.print_fifo_status();
 ```
 
 
