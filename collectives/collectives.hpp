@@ -31,10 +31,14 @@
 #define STREAM hls::stream
 #endif
 
-#define DATA_WIDTH 512
-#define DEST_WIDTH 0
+#define TDATA_WIDTH 512
 
-typedef ap_axiu<DATA_WIDTH, 0, 0, DEST_WIDTH> stream_word;
+typedef ap_axiu<TDATA_WIDTH, 0, 0, 0> stream_word;
+
+#define TID_WIDTH 8
+#define TUSER_WIDTH 64
+#define TDEST_WIDTH 8
+typedef ap_axiu<TDATA_WIDTH, TID_WIDTH, TUSER_WIDTH, TDEST_WIDTH> full_stream_word;
 
 enum Collective
 {
