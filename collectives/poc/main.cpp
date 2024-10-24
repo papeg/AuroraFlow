@@ -76,9 +76,10 @@ int main(int argc, char **argv)
         hostname = new char[100];
         gethostname(hostname, 100);
 
-        uint32_t device_id = xcl_emulation_mode == "hw" ? rank % 3 : 0;
-        xrt::device device(device_id);
-        std::cout << "programming device " << device_id << " on rank " << rank << " and host " << hostname << std::endl;
+        //uint32_t device_id = xcl_emulation_mode == "hw" ? 2 : 0;
+        std::string device_string = "0000:01:00.1";
+        xrt::device device(0);
+        std::cout << "programming device " << 0 << " on rank " << rank << " and host " << hostname << std::endl;
 
         std::string xclbin_path = "p2p_simplex_u32_hw.xclbin";
         xrt::uuid xclbin_uuid = device.load_xclbin(xclbin_path);
@@ -95,6 +96,9 @@ int main(int argc, char **argv)
         if (rank == 0) {
             std::cout << "Aurora Ring connected" << std::endl;
         }
+
+        std::cout << "waiting for letsgo file" << std::endl;
+        while (rename("letsgo", "started") != 0) {}
 
         uint32_t count = 64;
         uint32_t ref_data[count];
