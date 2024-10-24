@@ -29,7 +29,6 @@ def create_node_ring_linkconfig(n):
 
 for num in nums:
     linkconfig = create_node_ring_linkconfig(num)
-    print(linkconfig)
     script = template.format(num, math.ceil(num / 3), linkconfig, urllib.request.pathname2url(linkconfig))
     path = 'build/run_main_n{}.sh'.format(num)
     with open(path, 'w+') as f:

@@ -97,8 +97,14 @@ int main(int argc, char **argv)
             std::cout << "Aurora Ring connected" << std::endl;
         }
 
-        std::cout << "waiting for letsgo file" << std::endl;
-        while (rename("letsgo", "started") != 0) {}
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        if (rank == 0) {
+            std::cout << "waiting for letsgo file" << std::endl;
+            while (rename("letsgo", "started") != 0) {}
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
 
         uint32_t count = 64;
         uint32_t ref_data[count];
@@ -143,7 +149,17 @@ int main(int argc, char **argv)
 
             }
         }
-
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (rank == 0) {
+        std::cout << "waiting for letsfinish file" << std::endl;
+        while (rename("letsfinish", "finished") != 0) {}
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+
     MPI_Finalize();
 }

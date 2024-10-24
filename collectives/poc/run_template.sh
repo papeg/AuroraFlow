@@ -8,7 +8,7 @@
 #SBATCH -p fpga
 #SBATCH -A hpc-lco-kenter
 #SBATCH --constraint xilinx_u280_xrt2.15
-#SBATCH -w n2fpga08,n2fpga04,n2fpga05
+#SBATCH -w n2fpga03,n2fpga04,n2fpga05
 
 ## Load environment modules
 source env.sh
