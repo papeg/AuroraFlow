@@ -152,7 +152,7 @@ public:
         test_run.set_arg(5, rank);
         test_run.set_arg(6, size);
 
-        errors_bo = xrt::bo(device, 1, xrt::bo::flags::normal, test_kernel.group_id(8));
+        errors_bo = xrt::bo(device, 4, xrt::bo::flags::normal, test_kernel.group_id(8));
 
         test_run.set_arg(8, errors_bo);
     }
