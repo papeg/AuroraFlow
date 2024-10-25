@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <unistd.h>
+#include <filesystem>
 
 #include "../../host/Aurora.hpp"
 
@@ -76,12 +77,19 @@ int main(int argc, char **argv)
         hostname = new char[100];
         gethostname(hostname, 100);
 
-        //uint32_t device_id = xcl_emulation_mode == "hw" ? 2 : 0;
-        std::string device_string = "0000:01:00.1";
-        xrt::device device(0);
-        std::cout << "programming device " << 0 << " on rank " << rank << " and host " << hostname << std::endl;
+        std::stringstream workdir;
+        workdir << "run_dir_" << rank;
+        std::filesystem::create_directory(workdir.str());
+        std::filesystem::current_path(workdir.str());
 
-        std::string xclbin_path = "p2p_simplex_u32_hw.xclbin";
+        //uint32_t device_id = xcl_emulation_mode == "hw" ? (2 - (rank % 3)) : 0;
+        uint32_t device_id = xcl_emulation_mode == "hw" ? 0 : 0;
+
+        std::cout << "programming device " << device_id << " on rank " << rank << " and host " << hostname << std::endl;
+
+        xrt::device device(device_id);
+
+        std::string xclbin_path = "../p2p_simplex_u32_hw.xclbin";
         xrt::uuid xclbin_uuid = device.load_xclbin(xclbin_path);
 
         AuroraRing aurora_ring;
@@ -99,12 +107,14 @@ int main(int argc, char **argv)
 
         MPI_Barrier(MPI_COMM_WORLD);
 
+        /*
         if (rank == 0) {
             std::cout << "waiting for letsgo file" << std::endl;
             while (rename("letsgo", "started") != 0) {}
         }
 
         MPI_Barrier(MPI_COMM_WORLD);
+        */
 
         uint32_t count = 64;
         uint32_t ref_data[count];
@@ -136,30 +146,20 @@ int main(int argc, char **argv)
 
         if (p2p_simplex_u32_run.wait(std::chrono::milliseconds(10000)) == ERT_CMD_STATE_TIMEOUT) {
             std::cout << "Timeout on rank " << rank << std::endl;
-        } else {
+        }
+        if (rank == 0) {
             uint32_t result_data[count];
             output_buffer.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
             output_buffer.read(result_data);
-            if (rank == 0) {
-                for (uint32_t i = 0; i < count; i++) {
-                    if (ref_data[i] != result_data[i]) {
-                        std::cout << i << ": " << ref_data[i] << " != " << result_data[i] << std::endl;
-                    }
+            for (uint32_t i = 0; i < count; i++) {
+                if (ref_data[i] != result_data[i]) {
+                    std::cout << i << ": " << ref_data[i] << " != " << result_data[i] << std::endl;
                 }
-
             }
         }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-
-    if (rank == 0) {
-        std::cout << "waiting for letsfinish file" << std::endl;
-        while (rename("letsfinish", "finished") != 0) {}
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
 
     MPI_Finalize();
 }

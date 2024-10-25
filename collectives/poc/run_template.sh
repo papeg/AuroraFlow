@@ -13,6 +13,9 @@
 ## Load environment modules
 source env.sh
 
+for i in $(seq 0 $(({0} - 1))); do
+    rm -rf run_dir_$i
+done
 #https://pc2.github.io/fpgalink-gui/index.html?import={3}
 changeFPGAlinksXilinx {2}
 srun -l -n {1} --spread-job ../../scripts/reset.sh
