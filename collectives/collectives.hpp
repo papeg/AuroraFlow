@@ -213,7 +213,7 @@ inline void write_array(STREAM<stream_word> &out, T *values, uint32_t count)
 write_array_loop:
     for (uint32_t i = 0; i < count; i++)
     {
-#pragma HLS pipeline II=2
+#pragma HLS pipeline II=1
         stream_word_union_t data_0;
         pack_word(data_0, values + (i * width));
         out.write(data_0.word_data);
