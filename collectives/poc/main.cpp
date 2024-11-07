@@ -80,14 +80,32 @@ int main(int argc, char **argv)
         std::stringstream workdir;
         workdir << "run_dir_" << rank;
         std::filesystem::create_directory(workdir.str());
+        std::stringstream xrtini;
+        xrtini << workdir.str() << "/xrt.ini";
+        std::filesystem::copy_file("xrt.ini", xrtini.str());
         std::filesystem::current_path(workdir.str());
 
         //uint32_t device_id = xcl_emulation_mode == "hw" ? (2 - (rank % 3)) : 0;
-        uint32_t device_id = xcl_emulation_mode == "hw" ? 0 : 0;
+        //uint32_t device_id = xcl_emulation_mode == "hw" ? 2 : 0;
+        /*
+        std::string device_bdf;
+        switch(rank % 3) {
+            case 0:
+                device_bdf = "0000:a1:00.1";
+                break; 
+            case 1:
+                device_bdf = "0000:81:00.1";
+                break;
+            case 2:
+                device_bdf = "0000:01:00.1";
+                break;
+        }
+        */
+        std::string device_bdf = "0000:01:00.1";
 
-        std::cout << "programming device " << device_id << " on rank " << rank << " and host " << hostname << std::endl;
+        std::cout << "programming device " << device_bdf << " on rank " << rank << " and host " << hostname << std::endl;
 
-        xrt::device device(device_id);
+        xrt::device device(device_bdf);
 
         std::string xclbin_path = "../p2p_simplex_u32_hw.xclbin";
         xrt::uuid xclbin_uuid = device.load_xclbin(xclbin_path);
@@ -151,10 +169,15 @@ int main(int argc, char **argv)
             uint32_t result_data[count];
             output_buffer.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
             output_buffer.read(result_data);
+            uint32_t errors = 0;
             for (uint32_t i = 0; i < count; i++) {
                 if (ref_data[i] != result_data[i]) {
+                    errors++;
                     std::cout << i << ": " << ref_data[i] << " != " << result_data[i] << std::endl;
                 }
+            }
+            if (!errors) {
+                std::cout << "no errors" << std::endl;
             }
         }
     }

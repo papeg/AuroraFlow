@@ -8,7 +8,8 @@
 #SBATCH -p fpga
 #SBATCH -A hpc-lco-kenter
 #SBATCH --constraint xilinx_u280_xrt2.15
-#SBATCH -w n2fpga03,n2fpga04,n2fpga05
+#SBATCH -x n2fpga01,n2fpga14
+#SBATCH --distribution=block
 
 ## Load environment modules
 source env.sh
@@ -18,6 +19,8 @@ for i in $(seq 0 $(({0} - 1))); do
 done
 #https://pc2.github.io/fpgalink-gui/index.html?import={3}
 changeFPGAlinksXilinx {2}
-srun -l -n {1} --spread-job ../../scripts/reset.sh
+srun -l -n {0} --spread-job ../../scripts/reset.sh
 
 srun -l -n {0} --spread-job ./poc
+
+xbutil examine

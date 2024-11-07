@@ -38,7 +38,13 @@ p2p_simplex_u32_$(TARGET).xo: ./p2p_simplex.cpp ../collectives.hpp ../offload/co
 p2p_simplex_u32_hw.xclbin: aurora p2p_simplex_u32_$(TARGET).xo link_simplex_u32.cfg
 	v++ $(LINKFLAGS) --temp_dir _x_p2p_simplex_u32_$(TARGET)_impl --config link_simplex_u32.cfg --output $@ p2p_simplex_u32_hw.xo ../../aurora_hls_0.xo ../../aurora_hls_1.xo
 
-xclbin: p2p_simplex_u32_hw.xclbin
+p2p_simplex_u32_hw_emu.xclbin: aurora p2p_simplex_u32_$(TARGET).xo link_simplex_u32.cfg
+	v++ $(LINKFLAGS) --temp_dir _x_p2p_simplex_u32_$(TARGET)_impl --config link_simplex_u32_emu.cfg --output $@ p2p_simplex_u32_hw.xo
+
+p2p_simplex_u32_sw_emu.xclbin: aurora p2p_simplex_u32_$(TARGET).xo link_simplex_u32.cfg
+	v++ $(LINKFLAGS) --temp_dir _x_p2p_simplex_u32_$(TARGET)_impl --config link_simplex_u32_emu.cfg --output $@ p2p_simplex_u32_hw.xo
+
+xclbin: p2p_simplex_u32_$(TARGET).xclbin
 
 # host flags
 CXX=mpicxx

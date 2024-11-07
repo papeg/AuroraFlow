@@ -24,7 +24,7 @@ def create_node_ring_linkconfig(n):
     nodes = ['n{:02d}'.format(i) for i in range(n)]
     devices = ['acl{}'.format(2) for i in range(n)]
     for i in range(n):
-        conf += '--fpgalink={}:{}:ch0-{}:{}:ch1 '.format(nodes[i-1], devices[i-1], nodes[i], devices[i])
+        conf += '--fpgalink={}:{}:ch1-{}:{}:ch0 '.format(nodes[i-1], devices[i-1], nodes[i], devices[i])
     return conf
 
 for num in nums:
