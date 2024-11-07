@@ -85,9 +85,11 @@ extern "C"
         Ring ring(rank, size);
         while (true)
         {
+#pragma HLS protocol fixed
             stream_word_union_t header;
             if (ring_east_rx.read_nb(header.word_data))
             {
+                ap_wait();
                 switch (header.header.collective)
                 {
                     case Collective::Barrier: 
@@ -99,6 +101,7 @@ extern "C"
             }
             if (ring_west_rx.read_nb(header.word_data))
             {
+                ap_wait();
                 switch (header.header.collective)
                 {
                     case Collective::Barrier: 
@@ -110,6 +113,7 @@ extern "C"
             }
             if (offload_in.read_nb(header.word_data))
             {
+                ap_wait();
                 switch (header.header.collective)
                 {
                     case Collective::Barrier: 

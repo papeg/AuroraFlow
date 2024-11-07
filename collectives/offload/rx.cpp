@@ -32,7 +32,9 @@ extern "C"
         stream_word_union_t header;
         while (true)
         {
+#pragma HLS protocol fixed
             header.word_data = ring_in.read();    
+            ap_wait();
             switch (header.header.collective)
             {
                 case Collective::P2P:

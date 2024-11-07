@@ -31,12 +31,15 @@ extern "C"
         stream_word_union_t header;
         while (true)
         {
+#pragma HLS protocol fixed
             if (ring_in.read_nb(header.word_data))
             {
+                ap_wait();
                 stream_array(header, ring_in, ring_out);
             }
             if (offload_in.read_nb(header.word_data))
             {
+                ap_wait();
                 stream_array(header, offload_in, ring_out);
             }
         }

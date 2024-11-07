@@ -109,6 +109,8 @@ extern "C"
         ARC arc(rank, size, offload_in, offload_out);
         for (uint32_t i = 0; i < iterations; i++)
         {
+#pragma HLS protocol fixed
+            ap_wait();
             switch (datatype)
             {
                 case Datatype::Float:
