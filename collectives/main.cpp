@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <unistd.h>
+#include <filesystem>
 
 #include "../host/Aurora.hpp"
 
@@ -33,7 +34,7 @@ inline std::string aurora_id(size_t rank, size_t port)
 std::string get_xclbin_path(std::string xcl_emulation_mode)
 {
     std::stringstream path;
-    path << "collectives_test_" << xcl_emulation_mode << ".xclbin";
+    path << "./collectives_test_" << xcl_emulation_mode << ".xclbin";
     return path.str();
 }
 
@@ -191,7 +192,8 @@ public:
         uint32_t errors_sum;
         MPI_Reduce(&errors, &errors_sum, 1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
 
-        // dont check errors for benchmarking
+        // dont check errors for benchmarking, skipped for now
+        /*
         test_run.set_arg(7, false);
         double start_time = get_wtime();
         test_run.start();
@@ -205,7 +207,7 @@ public:
         {
             write_metrics(collective, dest, datatype, errors_sum, count, iterations, run_time_max);
         }
-        MPI_Barrier(MPI_COMM_WORLD);
+        */
         return errors;
     }
 
@@ -345,6 +347,16 @@ int main(int argc, char **argv)
     }
     else
     {
+        /*
+        std::stringstream workdir;
+        workdir << "run_dir_" << rank;
+        std::filesystem::create_directory(workdir.str());
+        std::stringstream xrtini;
+        xrtini << workdir.str() << "/xrt.ini";
+        std::filesystem::copy_file("xrt.ini", xrtini.str(), std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::current_path(workdir.str());
+        */
+
         char* hostname;
         hostname = new char[100];
         gethostname(hostname, 100);
@@ -367,15 +379,17 @@ int main(int argc, char **argv)
             }
         }
         HardwareTestKernel test_kernel;
-        HardwareTestKernel test_kernel_for_hw_emu;
+        HardwareTestKernel test_kernel_for_hw_emu_1;
+        HardwareTestKernel test_kernel_for_hw_emu_2;
         if (xcl_emulation_mode == "hw")
         {
             test_kernel = HardwareTestKernel(rank, size, device, xclbin_uuid, xcl_emulation_mode);
         }
         else
         {
-            test_kernel = HardwareTestKernel(0, 2, device, xclbin_uuid, xcl_emulation_mode);
-            test_kernel_for_hw_emu = HardwareTestKernel(1, 2, device, xclbin_uuid, xcl_emulation_mode);
+            test_kernel = HardwareTestKernel(0, 3, device, xclbin_uuid, xcl_emulation_mode);
+            test_kernel_for_hw_emu_1 = HardwareTestKernel(1, 3, device, xclbin_uuid, xcl_emulation_mode);
+            test_kernel_for_hw_emu_1 = HardwareTestKernel(2, 3, device, xclbin_uuid, xcl_emulation_mode);
         }
 
         if (rank == 0)
@@ -384,7 +398,7 @@ int main(int argc, char **argv)
             {
                 // spin until debug_hw is ready
                 std::cout << "waiting for letsgo file" << std::endl;
-                while (rename("letsgo", "started") != 0) {}
+                while (rename("../letsgo", "../started") != 0) {}
             }
         }
         MPI_Barrier(MPI_COMM_WORLD);
@@ -405,13 +419,22 @@ int main(int argc, char **argv)
                             {
                                 std::cout << "testing collective: " << collective << ", datatype: " << datatype << ", count: " << count << ", dest: " << dest << std::endl;
                             }
-                            std::thread test_run;
+                            std::thread test_run_1, test_run_2;
                             if (xcl_emulation_mode == "hw_emu")
                             {
-                                test_run = test_kernel_for_hw_emu.run_test_thread(collective, datatype, count, iterations, dest);
+                                test_run_1 = test_kernel_for_hw_emu_1.run_test_thread(collective, datatype, count, iterations, dest);
+                                test_run_2 = test_kernel_for_hw_emu_2.run_test_thread(collective, datatype, count, iterations, dest);
                             }
                             uint32_t errors = test_kernel.run_test(collective, datatype, count, iterations, dest);
-                            test_run.join();
+                            if (xcl_emulation_mode == "hw_emu")
+                            {
+                                test_run_1.join();
+                                test_run_2.join();
+                            }
+                            if (rank == 0) {
+                                std::cout << "waiting for test runs to finish" << std::endl;
+                            }
+                            MPI_Barrier(MPI_COMM_WORLD);
                             std::cout << "errors: " << errors << std::endl;
                             errors_per_rank += errors;
                             MPI_Barrier(MPI_COMM_WORLD);
@@ -423,13 +446,22 @@ int main(int argc, char **argv)
                         {
                             std::cout << "testing collective: " << collective << ", datatype: " << datatype << ", count: " << count << std::endl;
                         }
-                        std::thread test_run;
+                        std::thread test_run_1, test_run_2;
                         if (xcl_emulation_mode == "hw_emu")
                         {
-                            test_run = test_kernel_for_hw_emu.run_test_thread(collective, datatype, count, iterations);
+                            test_run_1 = test_kernel_for_hw_emu_1.run_test_thread(collective, datatype, count, iterations);
+                            test_run_2 = test_kernel_for_hw_emu_2.run_test_thread(collective, datatype, count, iterations);
                         }
                         uint32_t errors = test_kernel.run_test(collective, datatype, count, iterations);
-                        test_run.join();
+                        if (xcl_emulation_mode == "hw_emu")
+                        {
+                            test_run_1.join();
+                            test_run_2.join();
+                        }
+                        if (rank == 0) {
+                            std::cout << "waiting for test runs to finish" << std::endl;
+                        }
+                        MPI_Barrier(MPI_COMM_WORLD);
                         std::cout << "errors: " << errors << std::endl;
                         errors_per_rank += errors;
                         MPI_Barrier(MPI_COMM_WORLD);
