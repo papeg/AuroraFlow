@@ -86,7 +86,7 @@ int main(int argc, char **argv)
         std::filesystem::current_path(workdir.str());
 
         //uint32_t device_id = xcl_emulation_mode == "hw" ? (2 - (rank % 3)) : 0;
-        //uint32_t device_id = xcl_emulation_mode == "hw" ? 2 : 0;
+        uint32_t device_id = xcl_emulation_mode == "hw" ? 0 : 0;
         /*
         std::string device_bdf;
         switch(rank % 3) {
@@ -101,11 +101,10 @@ int main(int argc, char **argv)
                 break;
         }
         */
-        std::string device_bdf = "0000:01:00.1";
 
-        std::cout << "programming device " << device_bdf << " on rank " << rank << " and host " << hostname << std::endl;
+        std::cout << "programming device " << device_id << " on rank " << rank << " and host " << hostname << std::endl;
 
-        xrt::device device(device_bdf);
+        xrt::device device(device_id);
 
         std::string xclbin_path = "../p2p_simplex_u32_hw.xclbin";
         xrt::uuid xclbin_uuid = device.load_xclbin(xclbin_path);
@@ -130,54 +129,56 @@ int main(int argc, char **argv)
             std::cout << "waiting for letsgo file" << std::endl;
             while (rename("letsgo", "started") != 0) {}
         }
-
-        MPI_Barrier(MPI_COMM_WORLD);
         */
 
-        uint32_t count = 64;
-        uint32_t ref_data[count];
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        uint32_t count_max = 1048576;
+        uint32_t ref_data[count_max];
         srand(time(NULL));
-        for (uint32_t i = 0; i < count; i++) {
+        for (uint32_t i = 0; i < count_max; i++) {
             ref_data[i] = rand();
         }
 
-        xrt::kernel p2p_simplex_u32 = xrt::kernel(device, xclbin_uuid, "p2p_simplex_u32");
-        xrt::run p2p_simplex_u32_run = xrt::run(p2p_simplex_u32);
+        for (uint32_t count = 16; count <= count_max; count <<= 1) {
+            std::cout << "running for count = " << count << std::endl;
+            xrt::kernel p2p_simplex_u32 = xrt::kernel(device, xclbin_uuid, "p2p_simplex_u32");
+            xrt::run p2p_simplex_u32_run = xrt::run(p2p_simplex_u32);
 
-        std::cout << "creating buffer" << std::endl;
 
-        xrt::bo input_buffer = xrt::bo(device, count * sizeof(uint32_t), xrt::bo::flags::normal, p2p_simplex_u32.group_id(2));
-        std::cout << "input buffer created" << std::endl;
-        input_buffer.write(ref_data);
-        input_buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+            xrt::bo input_buffer = xrt::bo(device, count * sizeof(uint32_t), xrt::bo::flags::normal, p2p_simplex_u32.group_id(2));
+            input_buffer.write(ref_data);
+            input_buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
-        xrt::bo output_buffer = xrt::bo(device, count * sizeof(uint32_t), xrt::bo::flags::normal, p2p_simplex_u32.group_id(3));
+            xrt::bo output_buffer = xrt::bo(device, count * sizeof(uint32_t), xrt::bo::flags::normal, p2p_simplex_u32.group_id(3));
 
-        std::cout << "created buffer" << std::endl;
+            p2p_simplex_u32_run.set_arg(0, rank);
+            p2p_simplex_u32_run.set_arg(1, count);
+            p2p_simplex_u32_run.set_arg(2, input_buffer);
+            p2p_simplex_u32_run.set_arg(3, output_buffer);
 
-        p2p_simplex_u32_run.set_arg(0, rank);
-        p2p_simplex_u32_run.set_arg(1, count);
-        p2p_simplex_u32_run.set_arg(2, input_buffer);
-        p2p_simplex_u32_run.set_arg(3, output_buffer);
+            p2p_simplex_u32_run.start();
 
-        p2p_simplex_u32_run.start();
-
-        if (p2p_simplex_u32_run.wait(std::chrono::milliseconds(10000)) == ERT_CMD_STATE_TIMEOUT) {
-            std::cout << "Timeout on rank " << rank << std::endl;
-        }
-        if (rank == 0) {
-            uint32_t result_data[count];
-            output_buffer.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
-            output_buffer.read(result_data);
-            uint32_t errors = 0;
-            for (uint32_t i = 0; i < count; i++) {
-                if (ref_data[i] != result_data[i]) {
-                    errors++;
-                    std::cout << i << ": " << ref_data[i] << " != " << result_data[i] << std::endl;
-                }
+            if (p2p_simplex_u32_run.wait(std::chrono::milliseconds(10000)) == ERT_CMD_STATE_TIMEOUT) {
+                std::cout << "Timeout on rank " << rank << std::endl;
             }
-            if (!errors) {
-                std::cout << "no errors" << std::endl;
+            MPI_Barrier(MPI_COMM_WORLD);
+            if (rank == 0) {
+                uint32_t result_data[count];
+                output_buffer.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+                output_buffer.read(result_data);
+                uint32_t errors = 0;
+                for (uint32_t i = 0; i < count; i++) {
+                    if (ref_data[i] != result_data[i]) {
+                        errors++;
+                        if (errors < 16) {
+                            std::cout << i << ": " << ref_data[i] << " != " << result_data[i] << std::endl;
+                        }
+                    }
+                }
+                if (!errors) {
+                    std::cout << "no errors" << std::endl;
+                }
             }
         }
     }
