@@ -135,49 +135,56 @@ int main(int argc, char **argv)
 
         uint32_t count_max = 1048576;
         uint32_t ref_data[count_max];
-        srand(time(NULL));
+        char *slurm_job_id = std::getenv("SLURM_JOB_ID");
+        uint32_t seed = (uint32_t)std::stoi(slurm_job_id);
+        srand(seed);
         for (uint32_t i = 0; i < count_max; i++) {
             ref_data[i] = rand();
         }
 
         for (uint32_t count = 16; count <= count_max; count <<= 1) {
-            std::cout << "running for count = " << count << std::endl;
-            xrt::kernel p2p_simplex_u32 = xrt::kernel(device, xclbin_uuid, "p2p_simplex_u32");
-            xrt::run p2p_simplex_u32_run = xrt::run(p2p_simplex_u32);
+            for (uint32_t dest = 1; dest < (uint32_t)size; dest++) {
+                std::cout << "count = " << count << std::endl;
+                std::cout << "dest = " << dest << std::endl;
+                xrt::kernel p2p_simplex_u32 = xrt::kernel(device, xclbin_uuid, "p2p_simplex_u32");
+                xrt::run p2p_simplex_u32_run = xrt::run(p2p_simplex_u32);
 
 
-            xrt::bo input_buffer = xrt::bo(device, count * sizeof(uint32_t), xrt::bo::flags::normal, p2p_simplex_u32.group_id(2));
-            input_buffer.write(ref_data);
-            input_buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+                xrt::bo input_buffer = xrt::bo(device, count * sizeof(uint32_t), xrt::bo::flags::normal, p2p_simplex_u32.group_id(4));
+                input_buffer.write(ref_data);
+                input_buffer.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
-            xrt::bo output_buffer = xrt::bo(device, count * sizeof(uint32_t), xrt::bo::flags::normal, p2p_simplex_u32.group_id(3));
+                xrt::bo output_buffer = xrt::bo(device, count * sizeof(uint32_t), xrt::bo::flags::normal, p2p_simplex_u32.group_id(5));
 
-            p2p_simplex_u32_run.set_arg(0, rank);
-            p2p_simplex_u32_run.set_arg(1, count);
-            p2p_simplex_u32_run.set_arg(2, input_buffer);
-            p2p_simplex_u32_run.set_arg(3, output_buffer);
+                p2p_simplex_u32_run.set_arg(0, rank);
+                p2p_simplex_u32_run.set_arg(1, 0);
+                p2p_simplex_u32_run.set_arg(2, dest);
+                p2p_simplex_u32_run.set_arg(3, count);
+                p2p_simplex_u32_run.set_arg(4, input_buffer);
+                p2p_simplex_u32_run.set_arg(5, output_buffer);
 
-            p2p_simplex_u32_run.start();
+                p2p_simplex_u32_run.start();
 
-            if (p2p_simplex_u32_run.wait(std::chrono::milliseconds(10000)) == ERT_CMD_STATE_TIMEOUT) {
-                std::cout << "Timeout on rank " << rank << std::endl;
-            }
-            MPI_Barrier(MPI_COMM_WORLD);
-            if (rank == 0) {
-                uint32_t result_data[count];
-                output_buffer.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
-                output_buffer.read(result_data);
-                uint32_t errors = 0;
-                for (uint32_t i = 0; i < count; i++) {
-                    if (ref_data[i] != result_data[i]) {
-                        errors++;
-                        if (errors < 16) {
-                            std::cout << i << ": " << ref_data[i] << " != " << result_data[i] << std::endl;
+                if (p2p_simplex_u32_run.wait(std::chrono::milliseconds(10000)) == ERT_CMD_STATE_TIMEOUT) {
+                    std::cout << "Timeout on rank " << rank << std::endl;
+                }
+                MPI_Barrier(MPI_COMM_WORLD);
+                if (rank == dest) {
+                    uint32_t result_data[count];
+                    output_buffer.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+                    output_buffer.read(result_data);
+                    uint32_t errors = 0;
+                    for (uint32_t i = 0; i < count; i++) {
+                        if (ref_data[i] != result_data[i]) {
+                            errors++;
+                            if (errors < 16) {
+                                std::cout << i << ": " << ref_data[i] << " != " << result_data[i] << std::endl;
+                            }
                         }
                     }
-                }
-                if (!errors) {
-                    std::cout << "no errors" << std::endl;
+                    if (!errors) {
+                        std::cout << "no errors" << std::endl;
+                    }
                 }
             }
         }
