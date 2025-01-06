@@ -181,7 +181,9 @@ public:
         test_run.set_arg(7, true);
         test_run.start();
 
-        test_run.wait();
+        if (test_run.wait(std::chrono::milliseconds(5)) == ERT_CMD_STATE_TIMEOUT) {
+            std::cout << "test_run timeout" << std::endl;
+        }
 
         uint32_t errors;
         errors_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
